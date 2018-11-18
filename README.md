@@ -1,2 +1,37 @@
-# sbm
-Bayesian inference on network spectral embeddings in SBMs with unknown latent dimension and number of communities
+# Separating human and automated activity in computer network traffic data
+
+This reposit contains *Julia* code used to separate human and automated activity on a single edge within a computer network. 
+
+The methodology builds up on the algorithm for detection of periodicities suggested in Heard, Rubin-Delanchy and Lawson (2014). A given edge can be classified as automated with significant level <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/c745b9b57c145ec5577b82542b2df546.svg?invert_in_darkmode" align=middle width=10.57650495pt height=14.1552444pt/> according to the the <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/2ec6e630f199f589a2402fdf3e0289d5.svg?invert_in_darkmode" align=middle width=8.27056725pt height=14.1552444pt/>-value obtained from a Fourier's <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/3cf4fbd05970446973fc3d9fa3fe3c41.svg?invert_in_darkmode" align=middle width=8.43037635pt height=14.1552444pt/>-test. Using this method, the entire activity observed from the edge is discarded from further analysis. In many instances though, the the activity on edges in NetFlow data is a mixture between human and automated connections. Therefore, a mixture model for classification of the automated and human events on the edge is proposed. 
+
+## Methodology
+
+### Fourier analysis
+
+Assume that <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/e2c473b0627500251619ee3222b5f1ba.svg?invert_in_darkmode" align=middle width=67.42223235pt height=20.2218027pt/> are the raw arrival times of events on an edge <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/0fa0326f423a749421f358bd1d3a1653.svg?invert_in_darkmode" align=middle width=53.67565335pt height=22.4657235pt/>, where <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/cbfb1b2a33b28eab8a3e59464768e810.svg?invert_in_darkmode" align=middle width=14.90868885pt height=22.4657235pt/> and <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/91aac9730317276af725abd8cef04ca9.svg?invert_in_darkmode" align=middle width=13.1963865pt height=22.4657235pt/> are client and server IP addresses. In NetFlow data, the <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/02ab12d0013b89c8edc7f0f2662fa7a9.svg?invert_in_darkmode" align=middle width=10.5869973pt height=20.2218027pt/>'s are expressed in seconds from the Unix epoch (January 1, 1970). From the raw arrival times, the counting process <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/bc26136196e30407c1303ffbe073b500.svg?invert_in_darkmode" align=middle width=33.7214988pt height=24.657534pt/> counts the number of events up to time <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/4f4f4e395762a3af4575de74c019ebb5.svg?invert_in_darkmode" align=middle width=5.93609775pt height=20.2218027pt/> from the beginning of the observation period. 
+
+Given <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/de3e1f364fdb63b83b40dccd545f87da.svg?invert_in_darkmode" align=middle width=162.9620025pt height=24.657534pt/>, where <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/2f118ee06d05f3c2d98361d9c30e38ce.svg?invert_in_darkmode" align=middle width=11.88931425pt height=22.4657235pt/> is the total observation time, the periodogram <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/ec6220dd5b1b0b041c2cef5a4282e12f.svg?invert_in_darkmode" align=middle width=51.5026083pt height=31.1415357pt/> can be calculated as follows:
+<p align="center"><img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/82d1c12d422abbbaf8fe5b36692b4478.svg?invert_in_darkmode" align=middle width=393.1414047pt height=53.95471455pt/></p>
+
+The periodogram can be easily evaluated at the Fourier frequencies <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/3b3c77a3ac66bae7c20ee3ae896d4007.svg?invert_in_darkmode" align=middle width=197.3341491pt height=24.657534pt/> using the Fast Fourier Transform (FFT). The presence of periodicities can be assessed using the Fourier's <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/3cf4fbd05970446973fc3d9fa3fe3c41.svg?invert_in_darkmode" align=middle width=8.43037635pt height=14.1552444pt/>-statistic:
+<p align="center"><img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/7610c527b41a3ca4260038f78e3cced2.svg?invert_in_darkmode" align=middle width=193.18586925pt height=49.3970961pt/></p>
+
+The <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/2ec6e630f199f589a2402fdf3e0289d5.svg?invert_in_darkmode" align=middle width=8.27056725pt height=14.1552444pt/>-value associated with an observed value <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/edd8e1b4a643e8dd7ef5f1c2b1cbdc59.svg?invert_in_darkmode" align=middle width=15.1655526pt height=22.638462pt/> of the test statistic for the null hypothesis <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/30074edb23bec8e7c47c584ff885e5b5.svg?invert_in_darkmode" align=middle width=20.21695005pt height=22.4657235pt/> of no periodicities is:
+<p align="center"><img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/a4d956ecfb6d2cf7f2cb0f06710456ad.svg?invert_in_darkmode" align=middle width=558.9765555pt height=52.38100065pt/></p>
+
+where <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/e08b72ddd2f1f1f6611e392a2f496078.svg?invert_in_darkmode" align=middle width=78.8337363pt height=24.657534pt/>.
+
+### Mixture modelling
+
+The following mixture model is used to make inference on the <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/6af8e9329c416994c3690752bde99a7d.svg?invert_in_darkmode" align=middle width=12.2955525pt height=14.1552444pt/>'s:
+<p align="center"><img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/58ac95467afd5bd554329dbc5613ccb8.svg?invert_in_darkmode" align=middle width=206.6582232pt height=18.3123831pt/></p>
+
+The distribution of <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/a5db2864f408f1246504f17cd9c63105.svg?invert_in_darkmode" align=middle width=36.1074516pt height=24.657534pt/> is chosen to be **wrapped normal**, and for <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/04a94bf0af1c46c432a53d344a452748.svg?invert_in_darkmode" align=middle width=37.867698pt height=24.657534pt/>, a **histogram step function** with fixed number <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/61e84f854bc6258d4108d08d4c4a0852.svg?invert_in_darkmode" align=middle width=13.2934098pt height=22.4657235pt/> of changepoints <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/0fe1677705e987cac4f589ed600aa6b3.svg?invert_in_darkmode" align=middle width=9.04685265pt height=14.1552444pt/> (specified a priori) is used. Conjugate priors are used for efficient implementation. In the code, a full Gibbs sampler is used. 
+
+## Understanding the code
+
+The main part of the code is contained in the file `gibbs_sampler.jl`. The code also contains the implementation of an EM algorithm for a uniform - wrapped normal mixture model, used to initialise the algorithm. Finally, the code in `fft.jl` is used for periodicity detection from the sequence of raw data. For further extensions of this model, with a more flexible approach for modelling the human component, see the repository `fraspass/human_activity`.
+
+## References
+
+* Heard, N.A., Rubin-Delanchy, P.T.G. and Lawson, D.J. (2014). "Filtering automated polling traffic in computer network flow data". Proceedings - 2014 IEEE Joint Intelligence and Security Informatics Conference, JISIC 2014, 268-271. ([Link](https://ieeexplore.ieee.org/document/6975589/))
