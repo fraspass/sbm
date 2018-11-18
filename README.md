@@ -2,7 +2,7 @@
 
 ## Methodology
 
-<p align="center"><img src="https://rawgit.com/fraspass/sbm (fetch/None/svgs/d35ad7fc4ab3685de91bed2397cfdf67.svg?invert_in_darkmode" align=middle width=72.5798865pt height=14.2027941pt/></p>
+Prova: <img src="https://rawgit.com/fraspass/sbm (fetch/master/svgs/a706ca6393ced4222c0be553df2080dd.svg?invert_in_darkmode" align=middle width=87.9449703pt height=22.4657235pt/>
 
 ## Understanding the code
 

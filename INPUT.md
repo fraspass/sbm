@@ -2,7 +2,7 @@
 
 ## Methodology
 
-$$ X = emc^2 $$
+Prova: $X = e= mc$
 
 ## Understanding the code
 
