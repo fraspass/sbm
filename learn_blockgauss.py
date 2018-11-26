@@ -1,0 +1,111 @@
+#!/usr/bin/env python
+import sys
+import argparse
+import numpy as np
+from numpy.linalg import eig,slogdet,inv
+from numpy import pi,log,exp,sqrt
+from collections import Counter, OrderedDict
+from operator import itemgetter
+import matplotlib.pyplot as plt
+import sampler_functions
+from numpy.random import multivariate_normal as rmvn
+
+## Number of nodes
+n = 700
+## Community allocation
+c = np.random.choice(5,size=n)
+## Size of the dataset
+m = n
+## Latent dimension
+d = 2
+## Latent positions
+pos = np.array([[7,4],[3,1],[4,8],[1,.2],[9,2]])
+covs = .01*np.array([[2,.5],[.5,1]])
+## Create the array
+X = np.zeros((n,m))
+for i in range(n):
+    X[i,:d] = rmvn(mean=pos[c[i]],cov=covs) 
+    X[i,d:] = rmvn(mean=np.zeros(m-d),cov=.01*np.diag(np.ones(m-d)))
+
+## Set number of clusters, latent dimension and initial cluster allocation z
+K = 5
+d = 2
+z = np.copy(c)
+
+## Set the hyperparameters
+alpha = 1.0
+nu0 = .1
+kappa0 = 1.0
+## Posterior values for the marginalised 'garbage' Gaussian
+kappan = kappa0 + n 
+nun = nu0 + n
+## Initialise means
+mean0 = np.mean(X,axis=0)
+prior_sum = kappa0 * mean0
+## Posterior values for the marginalised 'garbage' Gaussian
+post_mean_tot = (prior_sum + np.sum(X,axis=0)) / kappan
+mean_r = post_mean_tot[d:]
+## Prior outer product, scaled by kappa0
+prior_outer = kappa0 * np.outer(mean0,mean0)
+## Parameters of the geometric distributions
+omega = .1
+delta = .1
+## Prior covariance
+Delta0 = np.diag(np.diag(np.cov(X)))
+## Initialise sum and mean
+sum_x = np.zeros((K,d))
+nk = np.zeros(K)
+mean_k = np.zeros((K,d))
+for k in range(K):
+    sum_x[k] = X[z==k,:d].sum(axis=0)
+    nk[k] = X[z == k,:d].shape[0]
+    mean_k[k] = (sum_x[k] + prior_sum[:d]) / (nk[k] + kappa0)
+
+## Calculate marginal posterior covariance for the 'garbage' Gaussian and its determinant (sequentially)
+post_Delta_tot = Delta0 + np.dot(X.T,X) + prior_outer - kappan * np.outer(post_mean_tot,post_mean_tot)
+Delta_r = post_Delta_tot[d:,d:]
+post_Delta_tot_det = np.zeros(m+1)
+for i in range(m+1):
+    post_Delta_tot_det[i] = slogdet(post_Delta_tot[i:,i:])[1]
+Delta_r_det = post_Delta_tot_det[d]
+
+## Posterior values for nu and kappa
+nunk = nu0 + nk
+kappank = kappa0 + nk
+
+## Calculate the sum of squares
+squared_sum_x = {}
+for k in range(K):
+    x = X[z == k,:d]
+    squared_sum_x[k] = np.dot(x.T,x)
+
+## Initialise the Deltas 
+Delta_k = {}
+Delta_k_inv = {}
+Delta_k_det = np.zeros(K)
+for k in range(K):
+    Delta_k[k] = Delta0[:d,:d] + squared_sum_x[k] + prior_outer[:d,:d] - kappank[k] * np.outer(mean_k[k],mean_k[k])
+    Delta_k_inv[k] = kappank[k] / (kappank[k] + 1.0) * inv(Delta_k[k])
+    Delta_k_det[k] = slogdet(Delta_k[k])[1]
+
+## Calculate an array of outer products for the entire node set
+full_outer_x = np.zeros((n,m,m))
+for x in range(n):
+    full_outer_x[x] = np.outer(X[x],X[x])
+
+## Calculate the determinants sequentialy for the prior
+Delta0_det = np.zeros(m+1)
+Delta0_det_r = np.zeros(m+1)
+for i in range(m+1):
+    Delta0_det[i] = slogdet(Delta0[:i,:i])[1]
+    Delta0_det_r[i] = slogdet(Delta0[i:,i:])[1]
+
+## Run Gibbs sampling
+for _ in range(100): print _; sampler_functions.gibbs_communities(l=n)
+
+## Plot result
+plt.scatter(X[:,0],X[:,1],c=z)
+plt.show()
+
+## Change dimension
+for _ in range(100): print _; sampler_functions.dimension_change()
