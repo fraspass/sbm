@@ -8,6 +8,12 @@ from collections import Counter, OrderedDict
 from operator import itemgetter
 import matplotlib.pyplot as plt
 from numpy.random import multivariate_normal as rmvn
+from scipy.stats import invwishart as iw
+from scipy.special import gammaln
+
+###################################
+## Simulate from the prior model ##
+###################################
 
 ## Number of nodes
 n = 700
@@ -17,7 +23,82 @@ c = np.random.choice(5,size=n)
 m = n
 ## Latent dimension
 d = 2
-## Latent positions
+K = 5
+## Simulate inverse Wishart for 'garbage' part
+nu0 = 2.0
+kappa0 = 0.1
+np.random.seed(117)
+Wr = iw.rvs(df=nu0+m-d-1,scale=np.diag(0.1*np.ones(m-d)))
+vr = rmvn(mean=np.zeros(m-d),cov=Wr/kappa0)
+W = iw.rvs(df=nu0+d-1,scale=np.diag(0.1*np.ones(d)),size=K)
+v = np.zeros((K,d))
+for k in range(K):
+    v[k] = rmvn(mean=np.zeros(2),cov=W[k]/kappa0)
+
+X = np.zeros((n,m))
+for i in range(n):
+    X[i,:d] = rmvn(mean=v[c[i]],cov=W[c[i]])
+    X[i,d:] = rmvn(mean=vr,cov=Wr)
+
+## Plot result
+plt.scatter(X[:,0],X[:,1],c=c)
+plt.show()
+
+###### Calculate marginal likelihoods for all the possible values of d
+mlik = np.zeros(m)
+## Posterior values for the marginalised 'garbage' Gaussian
+kappan = kappa0 + n 
+nun = nu0 + n
+## Prior means
+mean0 = np.zeros(m)
+prior_sum = kappa0 * mean0
+## Posterior values for the marginalised 'garbage' Gaussian
+post_mean = (prior_sum + np.sum(X,axis=0)) / kappan
+## Prior outer product, scaled by kappa0
+prior_outer = kappa0 * np.outer(mean0,mean0)
+## Prior covariance
+Delta0 = np.diag(0.1*np.ones(m))
+
+## Initialise sum and mean
+sums = np.zeros((K,m))
+nk = np.zeros(K)
+means = np.zeros((K,m))
+Deltank = {}
+Deltank_det = np.zeros((K,m+1))
+for k in range(K):
+    x = X[c==k]
+    sums[k] = x.sum(axis=0)
+    nk[k] = x.shape[0]
+    means[k] = (sums[k] + prior_sum) / (nk[k] + kappa0)
+    Deltank[k] = Delta0 + np.dot(x.T,x) + prior_outer - (kappa0 + nk[k]) * np.outer(means[k],means[k])
+    for d in range(m+1):
+        Deltank_det[k,d] = slogdet(Deltank[k][:d,:d])[1]
+
+post_Delta_tot = Delta0 + np.dot(X.T,X) + prior_outer - kappan * np.outer(post_mean,post_mean)
+Deltar_det = np.zeros(m+1)
+for d in range(m+1):
+    Deltar_det[d] = slogdet(post_Delta_tot[d:,d:])[1] 
+
+## Calculate the determinants sequentialy for the prior
+Delta0_det = np.zeros(m+1)
+Delta0_det_r = np.zeros(m+1)
+for i in range(m+1):
+    Delta0_det[i] = slogdet(Delta0[:i,:i])[1]
+    Delta0_det_r[i] = slogdet(Delta0[i:,i:])[1]
+
+for d in range(m):
+    ## Calculate the marginal likelihood for the garbage Gaussian
+    if d != m:
+        mlik[d] = -.5*n*m*log(np.pi) + .5*(m-d)*(log(kappa0) - log(kappan)) + .5*(nu0+m-d-1)*(Delta0_det_r[d] - Deltar_det[d])
+        mlik[d] += np.sum([gammaln(.5*(nun+m-d-i)) - gammaln(.5*(nu0+m-d-i)) for i in range(1,m-d+1)])
+    else:
+        mlik = 0
+    ## Calculate the marginal likelihood for the community allocations
+    if d != 0: 
+        for k in range(K):
+            mlik[d] += .5*d*(log(kappa0) - log(nk[k] + kappa0)) + .5*(nu0+d-1)*(Delta0_det[d] - Deltank_det[k,d])
+            mlik[d] += np.sum([gammaln(.5*(nu0+nk[k]+d-i)) - gammaln(.5*(nu0+d-i)) for i in range(1,d+1)]) 
+
 pos = np.array([[7,4],[3,1],[4,8],[1,.2],[9,2]])
 covs = .01*np.array([[2,.5],[.5,1]])
 ## Create the array
@@ -26,6 +107,14 @@ for i in range(n):
     X[i,:d] = rmvn(mean=pos[c[i]],cov=covs) 
     X[i,d:] = rmvn(mean=np.zeros(m-d),cov=.01*np.diag(np.ones(m-d)))
 
+## Plot result
+plt.scatter(X[:,0],X[:,1],c=c)
+plt.show()
+
+## Plot result
+plt.scatter(X[:,2],X[:,3],c=c)
+plt.show()
+
 ## Set number of clusters, latent dimension and initial cluster allocation z
 K = 5
 d = 2
@@ -33,8 +122,6 @@ z = np.copy(c)
 
 ## Set the hyperparameters
 alpha = 1.0
-nu0 = .1
-kappa0 = 1.0
 ## Posterior values for the marginalised 'garbage' Gaussian
 kappan = kappa0 + n 
 nun = nu0 + n

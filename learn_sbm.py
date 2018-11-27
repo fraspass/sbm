@@ -108,4 +108,4 @@ plt.scatter(X[:,0],X[:,1],c=z)
 plt.show()
 
 ## Change dimension
-for _ in range(100): print _; dimension_change()
+dd = np.zeros(100); for _ in range(100): print _; dimension_change(); dd[_] = d
