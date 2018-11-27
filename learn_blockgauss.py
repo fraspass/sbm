@@ -7,7 +7,6 @@ from numpy import pi,log,exp,sqrt
 from collections import Counter, OrderedDict
 from operator import itemgetter
 import matplotlib.pyplot as plt
-import sampler_functions
 from numpy.random import multivariate_normal as rmvn
 
 ## Number of nodes
@@ -101,11 +100,11 @@ for i in range(m+1):
     Delta0_det_r[i] = slogdet(Delta0[i:,i:])[1]
 
 ## Run Gibbs sampling
-for _ in range(100): print _; sampler_functions.gibbs_communities(l=n)
+for _ in range(100): print _; gibbs_communities(l=n)
 
 ## Plot result
 plt.scatter(X[:,0],X[:,1],c=z)
 plt.show()
 
 ## Change dimension
-for _ in range(100): print _; sampler_functions.dimension_change()
+for _ in range(100): print _; dimension_change()
