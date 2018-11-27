@@ -10,8 +10,11 @@ where <img alt="$\mathcal S_{K-1}$" src="svgs/1ca2006f4cd689950a74e72a91091a21.s
 
 ## Understanding the code
 
-The main part of the code is contained in the file `gibbs_sampler.jl`. The code also contains the implementation of an EM algorithm for a uniform - wrapped normal mixture model, used to initialise the algorithm. Finally, the code in `fft.jl` is used for periodicity detection from the sequence of raw data. For further extensions of this model, with a more flexible approach for modelling the human component, see the repository `fraspass/human_activity`.
+The main part of the code is contained in the file `sampler_functions.py`, which includes the main proposals used in the MCMC sampler. The files `learn_sbm.py` and `learn_blockgauss.py` contain code to simulate graph embeddings or a block Gaussian.
 
+<!--
 ## References
 
 * Heard, N.A., Rubin-Delanchy, P.T.G. and Lawson, D.J. (2014). "Filtering automated polling traffic in computer network flow data". Proceedings - 2014 IEEE Joint Intelligence and Security Informatics Conference, JISIC 2014, 268-271. ([Link](https://ieeexplore.ieee.org/document/6975589/))
+-->
+
