@@ -9,7 +9,7 @@ from operator import itemgetter
 import matplotlib.pyplot as plt
 
 ## Set the number of nodes
-n = 700
+n = 500
 ## Randomly allocate to clusters
 c = np.random.choice(5,size=n)
 ## Vector of latent positions
@@ -24,23 +24,23 @@ for i in range(n-1):
 ## Spectral decomposition --> n-dimensional embeddings
 w,v = eig(A)
 w_mag = (-w).argsort()
-m = n
+m = 10 ##int(np.floor(np.sqrt(n)))
 X = np.dot(v[:,w_mag[:m]],np.diag(abs(w[w_mag[:m]]))**.5)
 
 ## Set number of clusters, latent dimension and initial cluster allocation z
 K = 5
-d = 2
+d = 5 #2
 z = np.copy(c)
 
 ## Set the hyperparameters
 alpha = 1.0
-nu0 = .1
+nu0 = 1.0
 kappa0 = 1.0
 ## Posterior values for the marginalised 'garbage' Gaussian
 kappan = kappa0 + n 
 nun = nu0 + n
 ## Initialise means
-mean0 = np.mean(X,axis=0)
+mean0 = np.zeros(m) ##np.mean(X,axis=0)
 prior_sum = kappa0 * mean0
 ## Posterior values for the marginalised 'garbage' Gaussian
 post_mean_tot = (prior_sum + np.sum(X,axis=0)) / kappan
@@ -50,8 +50,8 @@ prior_outer = kappa0 * np.outer(mean0,mean0)
 ## Parameters of the geometric distributions
 omega = .1
 delta = .1
-## Prior covariance
-Delta0 = np.diag(np.diag(np.cov(X)))
+## Prior covariance 
+Delta0 = np.diag(np.ones(m)) ## np.diag(np.diag(np.cov(X.T)))
 ## Initialise sum and mean
 sum_x = np.zeros((K,d))
 nk = np.zeros(K)
@@ -67,6 +67,7 @@ Delta_r = post_Delta_tot[d:,d:]
 post_Delta_tot_det = np.zeros(m+1)
 for i in range(m+1):
     post_Delta_tot_det[i] = slogdet(post_Delta_tot[i:,i:])[1]
+
 Delta_r_det = post_Delta_tot_det[d]
 
 ## Posterior values for nu and kappa
@@ -93,7 +94,7 @@ full_outer_x = np.zeros((n,m,m))
 for x in range(n):
     full_outer_x[x] = np.outer(X[x],X[x])
 
-## Calculate the determinants sequentialy for the prior
+## Calculate the determinants sequentially for the prior
 Delta0_det = np.zeros(m+1)
 Delta0_det_r = np.zeros(m+1)
 for i in range(m+1):
@@ -101,11 +102,17 @@ for i in range(m+1):
     Delta0_det_r[i] = slogdet(Delta0[i:,i:])[1]
 
 ## Run Gibbs sampling
-for _ in range(100): print _; gibbs_communities(l=n)
+for _ in range(200): print _; gibbs_communities(l=n)
 
 ## Plot result
 plt.scatter(X[:,0],X[:,1],c=z)
 plt.show()
 
 ## Change dimension
-dd = np.zeros(100); for _ in range(100): print _; dimension_change(); dd[_] = d
+dd = np.zeros(100)
+for _ in range(100): print _; dimension_change(); dd[_] = d
+
+
+
+
+
