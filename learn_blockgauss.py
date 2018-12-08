@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from numpy.random import multivariate_normal as rmvn
 from scipy.stats import invwishart as iw
 from scipy.special import gammaln
+import mcmc_sampler_undirected as mcmc_sampler_class
 
 ###################################
 ## Simulate from the prior model ##
@@ -22,11 +23,11 @@ c = np.random.choice(5,size=n)
 ## Size of the dataset
 m = 25
 ## Latent dimension
-d = 10
+d = 2
 K = 5
 ## Simulate inverse Wishart for 'garbage' part
 nu0 = 2.0
-kappa0 = .1
+kappa0 = 0.01
 np.random.seed(1700)
 Wr = iw.rvs(df=nu0+m-d-1,scale=.01*np.diag(np.ones(m-d)))
 vr = rmvn(mean=np.zeros(m-d),cov=Wr/kappa0)
@@ -38,7 +39,23 @@ for k in range(K):
 X = np.zeros((n,m))
 for i in range(n):
     X[i,:d] = rmvn(mean=v[c[i]],cov=W[c[i]])
-    X[i,d:] = rmvn(mean=vr,cov=Wr)
+    X[i,d:] = rmvn(mean=vr,cov=Wr) ## rmvn(mean=np.zeros(m-d),cov=.01*np.diag(np.ones(m-d)))
+
+g = mcmc_sampler_class.gibbs_undirected(X)
+g.init_dim(d=10,delta=0.1)
+g.init_cluster(z=np.random.choice([0,1],size=g.n),K=2,alpha=1.0,omega=0.1)
+### g.init_cluster(z=c,K=6,alpha=1.0,omega=0.1)
+g.prior_gauss(mean0=np.zeros(g.m),Delta0=.01*np.diag(np.ones(g.m)),kappa0=0.1,nu0=2.0)##,covstrut='diagonal',meanstrut='known')
+g.marginal_likelihoods_dimension()
+plt.plot(g.mlik)
+
+for _ in range(100): g.gibbs_communities(l=g.n)
+for _ in range(100): g.dimension_change()
+g.split_merge()
+
+g.propose_empty()
+
+
 
 XX = np.copy(X)
 
@@ -155,7 +172,7 @@ plt.show()
 
 ## Set number of clusters, latent dimension and initial cluster allocation z
 K = 5
-d = 10
+d = 2
 z = np.copy(c)
 
 ## Set the hyperparameters
@@ -235,3 +252,201 @@ plt.show()
 ## Change dimension
 dd = np.zeros(100)
 for _ in range(100): print _; dimension_change(); dd[_] = d
+
+
+
+
+
+
+
+i,j = np.random.choice(n,size=2,replace=False)
+#i = 201
+#j = 158
+print str(i)
+print str(j)
+print str(z[i] == z[j])
+## Propose a split or merge move according to the sampled values
+if z[i] == z[j]:
+    split = True
+    zsplit = z[i]
+    ## Obtain the indices that must be re-allocated
+    S = np.delete(range(n),[i,j])[np.delete(z == zsplit,[i,j])]
+    z_prop = np.copy(z)
+    ## Move j to a new cluster
+    z_prop[j] = K
+else:
+    split = False
+    ## Choose to merge to the cluster with minimum index (zmerge) and remove the cluster with maximum index (zlost)
+    zmerge = min([z[i],z[j]])
+    zj = z[j]
+    zlost = max([z[i],z[j]])
+    z_prop = np.copy(z)
+    z_prop[z == zlost] = zmerge
+    if zlost != K-1:
+        for k in range(zlost,K-1):
+            z_prop[z == k+1] = k
+    ## Set of observations for the imaginary split (Dahl, 2003)
+    S = np.delete(range(n),[i,j])[np.delete((z == zmerge) + (z == zlost),[i,j])]
+
+## Initialise the proposal ratio
+prop_ratio = 0
+## Construct vectors for sequential posterior predictives
+nk_rest = np.ones(2,int)
+nunk_rest = nu0 + np.ones(2,int)
+kappa_rest = kappa0 + np.ones(2,int)
+sum_rest = X[[i,j],:d]
+mean_rest = (prior_sum[:d] + sum_rest) / (kappa0 + 1.0)
+squared_sum_restricted = full_outer_x[[i,j],:d,:d]
+Delta_restricted = {}; Delta_restricted_inv = {}; Delta_restricted_det = np.zeros(2)
+for q in [0,1]:
+    Delta_restricted[q] = Delta0[:d,:d] + squared_sum_restricted[q] + prior_outer[:d,:d] - kappa_rest[q] * np.outer(mean_rest[q],mean_rest[q])
+    Delta_restricted_inv[q] = kappa_rest[q] / (kappa_rest[q] + 1) * inv(Delta_restricted[q])
+    Delta_restricted_det[q] = slogdet(Delta_restricted[q])[1]
+
+## Randomly permute the indices in S and calculate the sequential allocations
+for h in np.random.permutation(S):
+    ## Calculate the predictive probability
+    position = X[h,:d]
+    out_position = np.outer(position,position)
+    pred_prob = exp(np.array([dmvt_efficient(x=position,mu=mean_rest[q],Sigma_inv=Delta_restricted_inv[q], \
+        Sigma_logdet=d*log((kappa_rest[q] + 1.0) / (kappa_rest[q] * nunk_rest[q]))+Delta_restricted_det[q], nu=nunk_rest[q]) for q in [0,1]]) + \
+        log(nunk_rest[q] + alpha/2.0))
+    pred_prob /= sum(pred_prob)
+    print pred_prob
+    if np.isnan(pred_prob).any():
+        break
+    if split:
+        ## Sample the new value
+        znew = np.random.choice(2,p=pred_prob)
+        ## Update proposal ratio
+        prop_ratio += log(pred_prob[znew])
+        ## Update proposed z
+        z_prop[h] = [zsplit,K][znew]
+    else:
+        ## Determine the new value deterministically
+        znew = int(z[h] == zj)
+        ## Update proposal ratio in the imaginary split
+        prop_ratio += log(pred_prob[znew])
+    
+    ## Update parameters 
+    nk_rest[znew] += 1
+    nunk_rest[znew] += 1
+    kappa_rest[znew] += 1
+    sum_rest[znew] += position
+    mean_rest[znew] = (prior_sum[:d] + sum_rest[znew]) / kappa_rest[znew]
+    squared_sum_restricted[znew] += out_position
+    Delta_restricted[znew] = Delta0[:d,:d] + squared_sum_restricted[znew] + prior_outer[:d,:d] - kappa_rest[znew] * np.outer(mean_rest[znew],mean_rest[znew])
+    Delta_restricted_inv[znew] = kappa_rest[znew] / (kappa_rest[znew] + 1.0) * inv(Delta_restricted[znew])
+    sign, Delta_restricted_det[znew] = slogdet(Delta_restricted[znew])
+    if sign < 0:
+        break
+
+## Calculate the acceptance probability
+if split:
+    ## Calculate the acceptance ratio
+    accept_ratio = .5*d*(log(kappa0) + log(kappank[zsplit]) - np.sum(log(kappa_rest))) 
+    accept_ratio += .5*(nu0+d-1)*Delta0_det[d] + .5*(nunk[zsplit]+d-1)*Delta_k_det[zsplit] - .5*np.sum((nunk_rest+d-1)*Delta_restricted_det)
+    accept_ratio += np.sum(gammaln(.5*(np.subtract.outer(nunk_rest+d,np.arange(d)+1))))
+    accept_ratio -= np.sum(gammaln(.5*(nu0+d-np.arange(d)+1))) + np.sum(gammaln(.5*(nunk[zsplit]+d-np.arange(d)+1))) 
+    accept_ratio += K*gammaln(float(alpha)/K) - (K+1)*gammaln(alpha/(K+1)) - np.sum(gammaln(nk + float(alpha)/K))
+    accept_ratio += np.sum(gammaln(np.delete(nk,zsplit) + alpha/(K+1.0))) + np.sum(gammaln(nk_rest + alpha/(K+1.0)))
+    accept_ratio += log(1.0-omega) - prop_ratio
+else:
+    ## Merge the two clusters and calculate the acceptance ratio
+    nk_sum = np.sum(nk[[zmerge,zlost]])
+    nunk_sum = nu0 + nk_sum
+    kappank_sum = kappa0 + nk_sum
+    sum_x_sum = sum_x[zmerge] + sum_x[zlost]
+    mean_k_sum = (prior_sum[:d] + sum_x_sum) / kappank_sum
+    squared_sum_x_sum = squared_sum_x[zlost] + squared_sum_x[zlost]
+    Delta_det_merged = slogdet(Delta0[:d,:d] + squared_sum_x_sum + prior_outer[:d,:d] - kappank_sum * np.outer(mean_k_sum,mean_k_sum))[1]
+    accept_ratio = -.5*d*(log(kappa0) + np.sum(log(kappank[[zmerge,zlost]])) - log(np.sum(kappa0 + nk[[zmerge,zlost]])))
+    accept_ratio -= .5*(nu0+d-1)*Delta0_det[d] + .5*(nu0+np.sum(nk[[zmerge,zlost]])+d-1)*Delta_det_merged 
+    accept_ratio += .5*np.sum((nunk[[zmerge,zlost]]+d-1)*Delta_k_det[[zmerge,zlost]])
+    accept_ratio += np.sum(gammaln(.5*(nu0+d-np.arange(d)+1))) + np.sum(gammaln(.5*(nu0+np.sum(nk[[zmerge,zlost]])+d-np.arange(d)+1)))
+    accept_ratio -= np.sum(gammaln(.5*(np.subtract.outer(nunk[[zmerge,zlost]]+d,np.arange(d)+1))))
+    accept_ratio += K*gammaln(float(alpha)/K) - (K-1)*gammaln(alpha/(K-1.0)) - np.sum(gammaln(nk + float(alpha)/K))
+    accept_ratio += np.sum(gammaln(np.delete(nk,[zmerge,zlost]) + float(alpha)/(K-1.0))) + gammaln(np.sum(nk_rest) + float(alpha)/(K-1.0))
+    accept_ratio -= log(1.0-omega) - prop_ratio
+
+plt.scatter(X[:,0],X[:,1],c=z_prop)
+accept_ratio
+
+
+
+
+
+
+## Accept or reject the proposal
+print str(exp(accept_ratio))
+accept = (-np.random.exponential(1) < accept_ratio)
+if accept:
+    ## Update the stored values
+    if split:
+            z = np.copy(z_prop)
+            nk[zsplit] = nk_rest[0]
+            nk = np.append(nk,nk_rest[1])
+            nunk = nu0 + nk 
+            kappank = kappa0 + nk
+            sum_x[zsplit] = sum_rest[0]
+            sum_x = np.append(sum_x,sum_rest)
+            mean_x = (prior_sum[:d] + sum_x) / kappank
+            squared_sum_x[zsplit] = squared_sum_restricted[0]
+            squared_sum_x[K] = squared_sum_restricted[1]
+            Delta_k[zsplit] = Delta_restricted[0]
+            Delta_k[K] = Delta_restricted[1]
+            Delta_k_inv[zsplit] = Delta_restricted_inv[0]
+            Delta_k_inv[K] = Delta_restricted_inv[1]
+            Delta_k_det[zsplit] = Delta_restricted_det[0]
+            Delta_k_det = np.append(Delta_k_det,Delta_restricted_det[1])
+            ## Update K 
+            K += 1
+    else:
+            z = np.copy(z_prop)
+            nk[zmerge] += nk[zlost]
+            nunk[zmerge] = nu0 + nk[zmerge]
+            kappank[zmerge] = kappa0 + nk[zmerge]
+            sum_x[zmerge] += sum_x[zlost]
+            mean_k[zmerge] = (prior_sum[:d] + sum_x[zmerge]) / kappank[zmerge]
+            squared_sum_x[zmerge] += squared_sum_x[zlost]
+            Delta_k[zmerge] = Delta0[:d,:d] + squared_sum_x[zmerge] + prior_outer[:d,:d] - kappank[zmerge] * np.outer(mean_k[zmerge],mean_k[zmerge])
+            Delta_k_inv[zmerge] = kappank[zmerge] / (kappank[zmerge] + 1.0) * inv(Delta_k[zmerge])
+            Delta_k_det[zmerge] = slogdet(Delta_k[zmerge])[1]
+            ## Delete components from vectors and dictionaries
+            nk = np.delete(nk,zlost)
+            nunk = np.delete(nunk,zlost)
+            kappank = np.delete(kappank,zlost)
+            sum_x = np.delete(sum_x,zlost,axis=0)
+            mean_k = np.delete(mean_k,zlost,axis=0)
+            ## Remove the element corresponding to the empty cluster
+            del squared_sum_x[zlost]
+            del Delta_k[zlost]
+            del Delta_k_inv[zlost]
+            Delta_k_det = np.delete(Delta_k_det,zlost)
+            ## Update the dictionaries and the allocations z
+            if zlost != K-1:
+                for k in range(zlost,K-1):
+                    squared_sum_x[k] = squared_sum_x[k+1]
+                    Delta_k[k] = Delta_k[k+1]
+                    Delta_k_inv[k] = Delta_k_inv[k+1]
+                ## Remove the final term
+                del squared_sum_x[K-1]
+                del Delta_k[K-1]
+                del Delta_k_inv[K-1] 
+            ## Update K
+            K -= 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

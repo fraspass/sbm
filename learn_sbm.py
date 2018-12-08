@@ -102,7 +102,7 @@ for i in range(m+1):
     Delta0_det_r[i] = slogdet(Delta0[i:,i:])[1]
 
 ## Run Gibbs sampling
-for _ in range(200): print _; gibbs_communities(l=n)
+for _ in range(100): print _; gibbs_communities(l=n)
 
 ## Plot result
 plt.scatter(X[:,0],X[:,1],c=z)
@@ -111,6 +111,71 @@ plt.show()
 ## Change dimension
 dd = np.zeros(100)
 for _ in range(100): print _; dimension_change(); dd[_] = d
+
+
+
+
+
+
+
+#!/usr/bin/env python
+import sys
+import argparse
+import numpy as np
+from numpy.linalg import eig,slogdet,inv
+from numpy import pi,log,exp,sqrt
+from collections import Counter, OrderedDict
+from operator import itemgetter
+import matplotlib.pyplot as plt
+import mcmc_sampler_undirected as mcmc_sampler_class
+
+## Set the number of nodes
+n = 500
+## Randomly allocate to clusters
+c = np.random.choice(5,size=n)
+## Vector of latent positions
+m = np.array([[.7,.4],[.3,.1],[.4,.8],[.1,.2],[.9,.2]])
+## Construct the adajcency matrix
+A = np.zeros((n,n))
+for i in range(n-1):
+  for j in range(i+1,n):
+    A[i,j] = np.random.binomial(1,np.sum(m[c[i]]*m[c[j]]))
+    A[j,i] = A[i,j]
+
+## Spectral decomposition --> n-dimensional embeddings
+w,v = eig(A)
+w_mag = (-abs(w)).argsort()
+m = 100 ##int(np.floor(np.sqrt(n)))
+X = 10*np.dot(v[:,w_mag[:m]],np.diag(abs(w[w_mag[:m]]))**.5)
+
+g = mcmc_sampler_class.gibbs_undirected(X)
+g.init_dim(d=10,delta=0.1)
+g.init_cluster(z=c)##np.random.choice([0,1],size=g.n),K=2,alpha=1.0,omega=0.1)
+### g.init_cluster(z=c,K=6,alpha=1.0,omega=0.1)
+g.prior_gauss(mean0=np.zeros(g.m),Delta0=np.diag(np.diag(np.cov(X.T)))/g.K,kappa0=1e-14,nu0=1.0)## ,covstrut='diagonal',meanstrut='known')
+## g.prior_gauss(mean0=np.zeros(g.m),Delta0=.01*np.diag(np.ones(g.m)),kappa0=1e-8,nu0=.0)##,covstrut='diagonal',meanstrut='known')
+g.marginal_likelihoods_dimension()
+for _ in range(10): g.gibbs_communities()
+
+
+
+
+plt.plot(g.mlik)
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
