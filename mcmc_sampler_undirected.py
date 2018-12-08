@@ -176,7 +176,7 @@ class gibbs_undirected:
 	###################################################
 	### b. Propose a change in the latent dimension ###
 	###################################################
-	def dimension_change(self):
+	def dimension_change(self,verbose=False):
 		## Propose a new value of d
 		if self.d == 0:
 			d_prop = 1
@@ -275,18 +275,17 @@ class gibbs_undirected:
 			self.Delta_k_det = Delta_k_det_prop
 			self.Delta_r = Delta_r_prop
 			self.Delta_r_det = Delta_r_det_prop
+		if verbose:
+			print 'Proposal: '+str(d_prop)+'\t'+'Accepted: '+str(accept)
 		return None
 
 	#################################################
 	### c. Propose to split (or merge) two groups ###
 	#################################################
 	### Split-merge move
-	def split_merge(self):
+	def split_merge(self,verbose=False):
 		## Randomly choose two indices
 		i,j = np.random.choice(self.n,size=2,replace=False)
-		print str(i)
-		print str(j)
-		print str(self.z[i] == self.z[j])
 		## Propose a split or merge move according to the sampled values
 		if self.z[i] == self.z[j]:
 			split = True
@@ -385,7 +384,6 @@ class gibbs_undirected:
 			accept_ratio += np.sum(gammaln(np.delete(self.nk,[zmerge,zlost]) + float(self.alpha)/(self.K-1.0))) + gammaln(np.sum(nk_rest) + float(self.alpha)/(self.K-1.0))
 			accept_ratio -= log(1.0-self.omega) - prop_ratio
 		## Accept or reject the proposal
-		print str(exp(accept_ratio))
 		accept = (-np.random.exponential(1) < accept_ratio)
 		if accept:
 			## Update the stored values
@@ -396,8 +394,8 @@ class gibbs_undirected:
 				self.nunk = self.nu0 + self.nk 
 				self.kappank = self.kappa0 + self.nk
 				self.sum_x[zsplit] = sum_rest[0]
-				self.sum_x = np.append(self.sum_x,sum_rest)
-				self.mean_x = (self.prior_sum[:self.d] + self.sum_x) / self.kappank
+				self.sum_x = np.vstack((self.sum_x,sum_rest[1]))
+				self.mean_k = np.divide((self.prior_sum[:self.d] + self.sum_x).T,self.kappank).T
 				self.squared_sum_x[zsplit] = squared_sum_restricted[0]
 				self.squared_sum_x[self.K] = squared_sum_restricted[1]
 				self.Delta_k[zsplit] = Delta_restricted[0]
@@ -443,12 +441,14 @@ class gibbs_undirected:
 					del self.Delta_k_inv[self.K-1] 
 				## Update K
 				self.K -= 1
-		return accept
+		if verbose:
+			print 'Proposal: '+['MERGE','SPLIT'][split]+'\t'+'Accepted: '+str(accept)
+		return None
 
 	########################################################
 	### d. Propose to add (or delete) an empty component ###
 	########################################################
-	def propose_empty(self):
+	def propose_empty(self,verbose=False):
 		## Propose to add or remove an empty cluster
 		if self.K == 1:
 			K_prop = 2
@@ -456,9 +456,14 @@ class gibbs_undirected:
 			K_prop = self.n-1
 		else:
 			K_prop = np.random.choice([self.K-1,self.K+1])
+		## Assign values to the variable remove
+		if K_prop < self.K:
+			remove = True
+		else:
+			remove = False
 		## If there are no empty clusters and K_prop = K-1, reject the proposal
 		if not (self.nk == 0).any() and K_prop < self.K:
-			return False
+			return None
 		## Propose a new vector of cluster allocations
 		if K_prop < self.K:
 			## Delete empty cluster with largest index
@@ -479,10 +484,10 @@ class gibbs_undirected:
 				self.nunk = np.append(self.nunk,self.nu0)
 				self.sum_x = np.vstack((self.sum_x,np.zeros((1,self.d))))
 				self.mean_k = np.vstack((self.mean_k,self.prior_sum[:self.d]/self.kappa0))
-				self.squared_sum_x[K] = np.zeros((self.d,self.d)) 
-				self.Delta_k[K] = self.Delta0[:self.d,:self.d] + self.prior_outer[:self.d,:self.d]
-				self.Delta_k_inv[K] = self.kappank[K] / (self.kappank[K] + 1.0) * inv(self.Delta_k[K])
-				self.Delta_k_det[K] = self.Delta_k[K]
+				self.squared_sum_x[self.K] = np.zeros((self.d,self.d)) 
+				self.Delta_k[self.K] = self.Delta0[:self.d,:self.d] + self.prior_outer[:self.d,:self.d]
+				self.Delta_k_inv[self.K] = self.kappank[self.K] / (self.kappank[self.K] + 1.0) * inv(self.Delta_k[self.K])
+				self.Delta_k_det = np.append(self.Delta_k_det,slogdet(self.Delta_k[self.K])[1])
 			else:
 				self.nk = nk_prop
 				self.kappank = np.delete(self.kappank,ind_delete)
@@ -506,7 +511,9 @@ class gibbs_undirected:
 					del self.Delta_k[K_prop]
 					del self.Delta_k_inv[K_prop] 
 			self.K = K_prop
-		return accept
+		if verbose:
+			print 'Proposal: '+['ADD','REMOVE'][remove]+'\t'+'Accepted: '+str(accept)
+		return None
 
 	## Utility function: calculates the marginal likelihood for all the possible values of d given a set of allocations z
 	def marginal_likelihoods_dimension(self):
