@@ -463,6 +463,8 @@ class gibbs_undirected:
 			remove = False
 		## If there are no empty clusters and K_prop = K-1, reject the proposal
 		if not (self.nk == 0).any() and K_prop < self.K:
+			if verbose:
+				print 'Proposal: '+ 'REMOVE'+'\t'+'Accepted: '+'False'
 			return None
 		## Propose a new vector of cluster allocations
 		if K_prop < self.K:
