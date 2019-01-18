@@ -764,8 +764,9 @@ class mcmc_sbm:
 				old_lik += np.sum(.5 * self.lambda0 * log(self.prior_sigma[self.d]) - .5 * self.lambdank * log(self.sigmank[:,0]))
 		else:
 			if self.directed:
-				old_lik += np.sum(gammaln(.5 * (self.nunk[key] + self.d - 1)) - gammaln(.5 * (self.nu0[key] + self.d - 1)))
-				new_lik += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][d_prop]) - .5 * self.lambdank[key] * log(sigmank_prop[key][:,0]))
+				for key in ['s','r']:
+					old_lik += np.sum(gammaln(.5 * (self.nunk[key] + self.d - 1)) - gammaln(.5 * (self.nu0[key] + self.d - 1)))
+					new_lik += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][d_prop]) - .5 * self.lambdank[key] * log(sigmank_prop[key][:,0]))
 			else:			
 				old_lik += np.sum(gammaln(.5 * (self.nunk + self.d - 1)) - gammaln(.5 * (self.nu0 + self.d - 1)))
 				new_lik += np.sum(.5 * self.lambda0 * log(self.prior_sigma[d_prop]) - .5 * self.lambdank * log(sigmank_prop[:,0]))
@@ -1991,14 +1992,15 @@ class mcmc_sbm:
 		## Calculate the marginal likelihood for right hand side of the Gaussian
 			if d != self.m:
 				if self.directed:
-					for k in range(self.sigmank[key].shape[0]):
-						self.mlik[d] += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][d:]) - \
-							.5 * self.lambdank[key][k] * log(squares[key][k,d:]))
-						self.mlik[d] += (self.m - d) * (gammaln(.5 * self.lambdank[key][k]) - gammaln(.5 * self.lambda0[key]))
-						if self.equal_var:
-							self.mlik[d] += -.5 * (self.vk[key][k] if self.coclust else self.vk[k]) * (self.m - d) * log(np.pi)
-						else:
-							self.mlik[d] += -.5 * (self.nk[key][k] if self.coclust else self.nk[k]) * (self.m - d) * log(np.pi)
+					for key in ['s','r']:
+						for k in range(self.sigmank[key].shape[0]):
+							self.mlik[d] += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][d:]) - \
+								.5 * self.lambdank[key][k] * log(squares[key][k,d:]))
+							self.mlik[d] += (self.m - d) * (gammaln(.5 * self.lambdank[key][k]) - gammaln(.5 * self.lambda0[key]))
+							if self.equal_var:
+								self.mlik[d] += -.5 * (self.vk[key][k] if self.coclust else self.vk[k]) * (self.m - d) * log(np.pi)
+							else:
+								self.mlik[d] += -.5 * (self.nk[key][k] if self.coclust else self.nk[k]) * (self.m - d) * log(np.pi)
 				else:
 					for k in range(self.sigmank.shape[0]):
 						self.mlik[d] += np.sum(.5 * self.lambda0 * log(self.prior_sigma[d:]) - .5 * self.lambdank[k] * log(squares[k,d:]))
@@ -2012,13 +2014,14 @@ class mcmc_sbm:
 			## Calculate the marginal likelihood for the community allocations
 			if d != 0: 
 				if self.directed:
-					for k in range(self.K[key] if self.coclust else self.K):
-						self.mlik[d] += -.5 * (self.nk[key][k] if self.coclust else self.nk[k]) * d * log(np.pi) + \
-							.5 * d * (log(self.kappa0[key]) - log((self.nk[key][k] if self.coclust else self.nk[k]) + self.kappa0[key])) + \
-							.5 * (self.nu0[key] + d - 1) * Delta0_det[key][d] - .5 * (self.nu0[key] + \
-							(self.nk[key][k] if self.coclust else self.nk[k]) + d - 1) * Deltank_det[key][k,d]
-						self.mlik[d] += np.sum([(gammaln(.5 * (self.nu0[key] + (self.nk[key][k] if self.coclust else self.nk[k]) + d - i)) - \
-							gammaln(.5 * (self.nu0[key] + d - i))) for i in range(1,d+1)])
+					for key in ['s','r']:
+						for k in range(self.K[key] if self.coclust else self.K):
+							self.mlik[d] += -.5 * (self.nk[key][k] if self.coclust else self.nk[k]) * d * log(np.pi) + \
+								.5 * d * (log(self.kappa0[key]) - log((self.nk[key][k] if self.coclust else self.nk[k]) + self.kappa0[key])) + \
+								.5 * (self.nu0[key] + d - 1) * Delta0_det[key][d] - .5 * (self.nu0[key] + \
+								(self.nk[key][k] if self.coclust else self.nk[k]) + d - 1) * Deltank_det[key][k,d]
+							self.mlik[d] += np.sum([(gammaln(.5 * (self.nu0[key] + (self.nk[key][k] if self.coclust else self.nk[k]) + d - i)) - \
+								gammaln(.5 * (self.nu0[key] + d - i))) for i in range(1,d+1)])
 				else:
 					for k in range(self.K):
 						self.mlik[d] += -.5 * self.nk[k] * d * log(np.pi) + .5 * d * (log(self.kappa0) - log(self.nk[k] + self.kappa0)) + \
