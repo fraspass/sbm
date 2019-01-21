@@ -686,7 +686,7 @@ class mcmc_sbm:
 						if sign_det <= 0.0:
 							raise ValueError("Covariance matrix for d_prop is not invertible. Check conditions.")
 			else:
-				sum_x_prop = np.hstack((self.sum_x, np.array([np.sum(self.X[self.z == i,range(self.d,d_prop)]) for i in range(self.K)], ndmin=2).T))
+				sum_x_prop = np.hstack((self.sum_x, np.array([np.sum(self.X[self.z == i][:,range(self.d,d_prop)],axis=0) for i in range(self.K)], ndmin=2).T))
 				mean_k_prop = np.divide((self.prior_sum[:d_prop] + sum_x_prop).T, self.kappank).T
 				for i in range(self.K):
 					squared_sum_x_prop[i] = self.full_outer_x[self.z == i,:d_prop,:d_prop].sum(axis=0)
@@ -864,7 +864,6 @@ class mcmc_sbm:
 		else:
 			accept_ratio += log(q_prop_new) - log(q_prop_old)
 		accept = ( -np.random.exponential(1) < accept_ratio )
-		print str(exp(accept_ratio))
 		## If the proposal is accepted, update the parameters
 		if accept:
 			self.d = d_prop
