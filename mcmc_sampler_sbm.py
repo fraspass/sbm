@@ -78,10 +78,10 @@ class mcmc_sbm:
 		## Initialise z 
 		self.z = np.copy(z)
 		## Initialise number of clusters
-		if K != 0 and K >= len(np.unique(z)):
+		if K != 0 and K >= (np.max(z)+1): ##len(np.unique(z)):
 			self.K = K
 		else:
-			self.K = len(np.unique(z))
+			self.K = (np.max(z)+1) ##len(np.unique(z))
 		## Initialise cluster counts and parameters of the prior distributions
 		self.nk = np.array([np.sum(self.z == k) for k in range(self.K)])
 		self.alpha = alpha
@@ -107,14 +107,14 @@ class mcmc_sbm:
 		self.z['r'] = np.copy(zr)
 		## Initialise Ks and Kr
 		self.K = {}
-		if Ks != 0 and Ks >= len(np.unique(zs)):
+		if Ks != 0 and Ks >= (np.max(zs)+1): ## len(np.unique(zs)):
 			self.K['s'] = Ks
 		else:
-			self.K['s'] = len(np.unique(zs))
-		if Kr != 0 and Kr >= len(np.unique(zr)):
+			self.K['s'] = (np.max(zs)+1) ##len(np.unique(zs))
+		if Kr != 0 and Kr >= (np.max(zr)+1): ##len(np.unique(zr)):
 			self.K['r'] = Kr
 		else:
-			self.K['r'] = len(np.unique(zr))
+			self.K['r'] = (np.max(zr)+1) ## len(np.unique(zr))
 		## Initialise the cluster counts
 		self.nk = {}
 		for key in ['s','r']: 
@@ -618,14 +618,47 @@ class mcmc_sbm:
 	###################################################
 	### b. Propose a change in the latent dimension ###
 	###################################################
-	def dimension_change(self,verbose=False):
+	def dimension_change(self,prop_step=1,delta_prop=0.2,verbose=False):
 		## Propose a new value of d
-		if self.d == 1:
-			d_prop = 2
-		elif self.d == self.m:
-			d_prop = self.m-1
+		if prop_step == 1:
+			if self.d == 1:
+				d_prop = 2
+			elif self.d == self.m:
+				d_prop = self.m-1
+			else:
+				d_prop = np.random.choice([self.d-1, self.d+1])
 		else:
-			d_prop = np.random.choice([self.d-1, self.d+1])
+			## Calculate the proposal 
+			if delta_prop != 0.0:
+				prop_probs_left = (1-delta_prop) ** (np.arange(len(range(np.max([1,self.d-prop_step]),self.d))))[::-1] * delta_prop
+				prop_probs_right = (1-delta_prop) ** (np.arange(len(range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1])))))) * delta_prop
+				if len(prop_probs_right) == 0:
+					probs = prop_probs_left / np.sum(prop_probs_left)
+				elif len(prop_probs_left) == 0:
+					probs = .5 * prop_probs_right / np.sum(prop_probs_right)
+				else:
+					probs = np.append(.5 * prop_probs_left / np.sum(prop_probs_left), .5 * prop_probs_right / np.sum(prop_probs_right))
+				props = np.append(range(np.max([1,self.d-prop_step]),self.d),range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1]))))
+			else:
+				props = np.append(range(np.max([1,self.d-prop_step]),self.d),range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1]))))
+				probs = 1.0/len(props) * np.ones(len(props))
+			d_prop = int(np.random.choice(props,p=probs))
+			q_prop_old = probs[np.where(props == d_prop)[0]][0]
+			## Calculate the inverse proposal
+			if delta_prop != 0.0:
+				prop_probs_left = (1-delta_prop) ** (np.arange(len(range(np.max([1,d_prop-prop_step]),d_prop))))[::-1] * delta_prop
+				prop_probs_right = (1-delta_prop) ** (np.arange(len(range(d_prop+1,int(np.min([self.m+1,d_prop+prop_step+1])))))) * delta_prop
+				if len(prop_probs_right) == 0:
+					probs = prop_probs_left / np.sum(prop_probs_left)
+				elif len(prop_probs_left) == 0:
+					probs = .5 * prop_probs_right / np.sum(prop_probs_right)
+				else:
+					probs = np.append(.5 * prop_probs_left / np.sum(prop_probs_left), .5 * prop_probs_right / np.sum(prop_probs_right))
+				props = np.append(range(np.max([1,d_prop-prop_step]),d_prop),range(d_prop+1,int(np.min([self.m+1,d_prop+prop_step+1]))))
+			else:
+				props = np.append(range(np.max([1,d_prop-prop_step]),d_prop),range(d_prop+1,int(np.min([self.m+1,d_prop+prop_step+1]))))
+				probs = 1.0/len(props) * np.ones(len(props))
+			q_prop_new = probs[np.where(props == self.d)[0]][0]
 		## Calculate likelihood for the current value of d 
 		squared_sum_x_prop = {}; Delta_k_prop = {}
 		Delta_k_det_prop = {} if self.directed else np.zeros(self.K)
@@ -641,8 +674,9 @@ class mcmc_sbm:
 		if d_prop > self.d:
 			if self.directed:
 				for key in ['s','r']:
-					sum_x_prop[key] = np.hstack((self.sum_x[key], np.array([np.sum(self.X[key][(self.z[key] if self.coclust else self.z) == i,d_prop-1]) \
-						for i in range(self.K[key] if self.coclust else self.K)], ndmin=2).T))
+					sum_x_prop[key] = np.hstack((self.sum_x[key], 
+						np.array([np.sum(self.X[key][(self.z[key] if self.coclust else self.z) == i][:,range(self.d,d_prop)],axis=0) \
+						for i in range(self.K[key] if self.coclust else self.K)], ndmin=2)))
 					mean_k_prop[key] = np.divide((self.prior_sum[key][:d_prop] + sum_x_prop[key]).T, self.kappank[key]).T
 					for i in range(self.K[key] if self.coclust else self.K):
 						squared_sum_x_prop[key][i] = self.full_outer_x[key][(self.z[key] if self.coclust else self.z) == i,:d_prop,:d_prop].sum(axis=0)
@@ -652,7 +686,7 @@ class mcmc_sbm:
 						if sign_det <= 0.0:
 							raise ValueError("Covariance matrix for d_prop is not invertible. Check conditions.")
 			else:
-				sum_x_prop = np.hstack((self.sum_x, np.array([np.sum(self.X[self.z == i,d_prop-1]) for i in range(self.K)], ndmin=2).T))
+				sum_x_prop = np.hstack((self.sum_x, np.array([np.sum(self.X[self.z == i,range(self.d,d_prop)]) for i in range(self.K)], ndmin=2).T))
 				mean_k_prop = np.divide((self.prior_sum[:d_prop] + sum_x_prop).T, self.kappank).T
 				for i in range(self.K):
 					squared_sum_x_prop[i] = self.full_outer_x[self.z == i,:d_prop,:d_prop].sum(axis=0)
@@ -666,32 +700,32 @@ class mcmc_sbm:
 				for key in ['s','r']:
 					sigmank_prop[key] = np.zeros((self.H[key] if self.equal_var else self.K[key],self.m - d_prop))
 					for k in range(sigmank_prop[key].shape[0]):
-						sigmank_prop[key][k] = self.sigmank[key][k,1:]
+						sigmank_prop[key][k] = self.sigmank[key][k,(d_prop-self.d):]
 			else:
 				if self.directed:
 					for key in ['s','r']:
 						sigmank_prop[key] = np.zeros((self.H if self.equal_var else self.K,self.m - d_prop))
 						for k in range(sigmank_prop[key].shape[0]):
-							sigmank_prop[key][k] = self.sigmank[key][k,1:]
+							sigmank_prop[key][k] = self.sigmank[key][k,(d_prop-self.d):]
 				else:
 					sigmank_prop = np.zeros((self.H if self.equal_var else self.K,self.m - d_prop))
 					for k in range(sigmank_prop.shape[0]):
-						sigmank_prop[k] = self.sigmank[k,1:]
+						sigmank_prop[k] = self.sigmank[k,(d_prop-self.d):]
 		else:
 			if self.directed:
 				for key in ['s','r']:
-					sum_x_prop[key] = self.sum_x[key][:,:-1]
-					mean_k_prop[key] = self.mean_k[key][:,:-1]
+					sum_x_prop[key] = self.sum_x[key][:,:(d_prop-self.d)]
+					mean_k_prop[key] = self.mean_k[key][:,:(d_prop-self.d)]
 					for i in range(self.K[key] if self.coclust else self.K):
-						squared_sum_x_prop[key][i] = self.squared_sum_x[key][i][:-1,:-1]
+						squared_sum_x_prop[key][i] = self.squared_sum_x[key][i][:(d_prop-self.d),:(d_prop-self.d)]
 						Delta_k_prop[key][i] = self.Delta0[key][:d_prop,:d_prop] + squared_sum_x_prop[key][i] + self.prior_outer[key][:d_prop,:d_prop] - \
 							self.kappank[key][i] * np.outer(mean_k_prop[key][i],mean_k_prop[key][i])
 						Delta_k_det_prop[key][i] = slogdet(Delta_k_prop[key][i])[1]
 			else:
-				sum_x_prop = self.sum_x[:,:-1]
-				mean_k_prop = self.mean_k[:,:-1]
+				sum_x_prop = self.sum_x[:,:(d_prop-self.d)]
+				mean_k_prop = self.mean_k[:,:(d_prop-self.d)]
 				for i in range(self.K):
-					squared_sum_x_prop[i] = self.squared_sum_x[i][:-1,:-1]
+					squared_sum_x_prop[i] = self.squared_sum_x[i][:(d_prop-self.d),:(d_prop-self.d)]
 					Delta_k_prop[i] = self.Delta0[:d_prop,:d_prop] + squared_sum_x_prop[i] + self.prior_outer[:d_prop,:d_prop] - \
 						self.kappank[i] * np.outer(mean_k_prop[i],mean_k_prop[i])
 					Delta_k_det_prop[i] = slogdet(Delta_k_prop[i])[1]
@@ -701,23 +735,41 @@ class mcmc_sbm:
 					for key in ['s','r']:
 						sigmank_prop[key] = np.zeros((self.H[key] if self.coclust else self.H,self.m - d_prop))
 						for h in range(self.H[key] if self.coclust else self.H):
-							sigmank_prop[key][h] = np.insert(self.sigmank[key][h], 0, self.prior_sigma[key][d_prop] + \
-								np.sum(self.X[key][(self.v[key][self.z[key]] if self.coclust else self.v[self.z]) == h,d_prop] ** 2))				
+							if prop_step == 1 or (self.d-d_prop) == 1:
+								sigmank_prop[key][h] = np.insert(self.sigmank[key][h], 0, self.prior_sigma[key][d_prop] + \
+									np.sum(self.X[key][(self.v[key][self.z[key]] if self.coclust else self.v[self.z]) == h,d_prop] ** 2))
+							else:
+								sigmank_prop[key][h] = np.append(self.prior_sigma[key][np.arange(d_prop,self.d)] + \
+									np.sum(self.X[key][(self.v[key][self.z[key]] if self.coclust else self.v[self.z]) == h][:,np.arange(d_prop,self.d)] ** 2, 
+									axis=0), self.sigmank[key][h])												
 				else:
 					sigmank_prop = np.zeros((self.H,self.m - d_prop))
 					for h in range(self.H):
-						sigmank_prop[h] = np.insert(self.sigmank[h], 0, self.prior_sigma[d_prop] + np.sum(self.X[self.v[self.z] == h,d_prop] ** 2))
+						if prop_step == 1 or (self.d-d_prop) == 1:
+							sigmank_prop[h] = np.insert(self.sigmank[h], 0, self.prior_sigma[d_prop] + np.sum(self.X[self.v[self.z] == h,d_prop] ** 2))
+						else:
+							sigmank_prop[h] = np.append(self.prior_sigma[np.arange(d_prop,self.d)] + \
+								np.sum(self.X[self.v[self.z] == h][:,np.arange(d_prop,self.d)] ** 2, axis=0), self.sigmank[h])
 			else:
 				if self.directed:
 					for key in ['s','r']:
 						sigmank_prop[key] = np.zeros((self.K[key] if self.coclust else self.K,self.m - d_prop))
 						for k in range(self.K[key] if self.coclust else self.K):
-							sigmank_prop[key][k] = np.insert(self.sigmank[key][k], 0, self.prior_sigma[key][d_prop] + \
-								np.sum(self.X[key][(self.z[key] if self.coclust else self.z) == k,d_prop] ** 2))
+							if prop_step == 1 or (self.d-d_prop) == 1:
+								sigmank_prop[key][k] = np.insert(self.sigmank[key][k], 0, self.prior_sigma[key][d_prop] + \
+									np.sum(self.X[key][(self.z[key] if self.coclust else self.z) == k,d_prop] ** 2))
+							else:
+								sigmank_prop[key][k] = np.append(self.prior_sigma[key][np.arange(d_prop,self.d)] + \
+									np.sum(self.X[key][(self.z[key] if self.coclust else self.z) == k][:,np.arange(d_prop,self.d)] ** 2, axis=0),
+									self.sigmank[key][k])
 				else:
 					sigmank_prop = np.zeros((self.K,self.m - d_prop))
 					for k in range(self.K):
-						sigmank_prop[k] = np.insert(self.sigmank[k], 0, self.prior_sigma[d_prop] + np.sum(self.X[self.z == k,d_prop] ** 2))
+						if prop_step == 1 or (self.d-d_prop) == 1:
+							sigmank_prop[k] = np.insert(self.sigmank[k], 0, self.prior_sigma[d_prop] + np.sum(self.X[self.z == k,d_prop] ** 2))
+						else:
+							sigmank_prop[k] = np.append(self.prior_sigma[np.arange(d_prop,self.d)] + \
+								np.sum(self.X[self.z == k][:,np.arange(d_prop,self.d)] ** 2, axis=0),self.sigmank[k])
 		# Calculate old likelihood
 		old_lik = 0
 		# Add the community specific components to the log-likelihood
@@ -757,23 +809,62 @@ class mcmc_sbm:
 		if d_prop > self.d:
 			if self.directed:
 				for key in ['s','r']:
-					new_lik += np.sum(gammaln(.5 * (self.nunk[key] + d_prop - 1)) - gammaln(.5 * (self.nu0[key] + d_prop - 1)))
-					old_lik += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][self.d]) - .5 * self.lambdank[key] * log(self.sigmank[key][:,0]))
+					if prop_step == 1:
+						new_lik += np.sum(gammaln(.5 * (self.nunk[key] + d_prop - 1)) - gammaln(.5 * (self.nu0[key] + d_prop - 1)))
+						old_lik += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][self.d]) - .5 * self.lambdank[key] * log(self.sigmank[key][:,0]))
+					else:
+						for k in range(self.K[key] if self.coclust else self.K):
+							new_lik += np.sum(gammaln(.5 * (self.nunk[key][k] + d_prop - 1 - np.arange(d_prop-self.d))) - \
+								gammaln(.5 * (self.nu0[key] + d_prop - 1 - np.arange(d_prop-self.d))))
+						for k in range(self.sigmank[key].shape[0]):
+							old_lik += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][np.arange(self.d,d_prop)]) - \
+								.5 * self.lambdank[key][k] * log(self.sigmank[key][k,np.arange(d_prop-self.d)]))
 			else:
-				new_lik += np.sum(gammaln(.5 * (self.nunk + d_prop - 1)) - gammaln(.5 * (self.nu0 + d_prop - 1)))
-				old_lik += np.sum(.5 * self.lambda0 * log(self.prior_sigma[self.d]) - .5 * self.lambdank * log(self.sigmank[:,0]))
+				if prop_step == 1:
+					new_lik += np.sum(gammaln(.5 * (self.nunk + d_prop - 1)) - gammaln(.5 * (self.nu0 + d_prop - 1)))
+					old_lik += np.sum(.5 * self.lambda0 * log(self.prior_sigma[self.d]) - .5 * self.lambdank * log(self.sigmank[:,0]))
+				else:
+					for k in range(self.K):
+						new_lik += np.sum(gammaln(.5 * (self.nunk[k] + d_prop - 1 - np.arange(d_prop-self.d))) - \
+							gammaln(.5 * (self.nu0 + d_prop - 1 - np.arange(d_prop-self.d))))
+					for k in range(self.sigmank.shape[0]):
+						old_lik += np.sum(.5 * self.lambda0 * log(self.prior_sigma[np.arange(self.d,d_prop)]) - \
+							.5 * self.lambdank[k] * log(self.sigmank[k,np.arange(d_prop-self.d)]))					
 		else:
 			if self.directed:
 				for key in ['s','r']:
-					old_lik += np.sum(gammaln(.5 * (self.nunk[key] + self.d - 1)) - gammaln(.5 * (self.nu0[key] + self.d - 1)))
-					new_lik += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][d_prop]) - .5 * self.lambdank[key] * log(sigmank_prop[key][:,0]))
-			else:			
-				old_lik += np.sum(gammaln(.5 * (self.nunk + self.d - 1)) - gammaln(.5 * (self.nu0 + self.d - 1)))
-				new_lik += np.sum(.5 * self.lambda0 * log(self.prior_sigma[d_prop]) - .5 * self.lambdank * log(sigmank_prop[:,0]))
+					if prop_step == 1:
+						old_lik += np.sum(gammaln(.5 * (self.nunk[key] + self.d - 1)) - gammaln(.5 * (self.nu0[key] + self.d - 1)))
+						new_lik += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][d_prop]) - .5 * self.lambdank[key] * log(sigmank_prop[key][:,0]))
+					else:
+						for k in range(self.K[key] if self.coclust else self.K):
+							old_lik += np.sum(gammaln(.5 * (self.nunk[key][k] + self.d - 1 - np.arange(self.d-d_prop))) - \
+								gammaln(.5 * (self.nu0[key] + self.d - 1 - np.arange(self.d-d_prop))))
+						for k in range(self.sigmank[key].shape[0]):
+							new_lik += np.sum(.5 * self.lambda0[key] * log(self.prior_sigma[key][np.arange(d_prop,self.d)]) - \
+								.5 * self.lambdank[key][k] * log(sigmank_prop[key][k,np.arange(self.d-d_prop)]))
+			else:
+				if prop_step == 1:		
+					old_lik += np.sum(gammaln(.5 * (self.nunk + self.d - 1)) - gammaln(.5 * (self.nu0 + self.d - 1)))
+					new_lik += np.sum(.5 * self.lambda0 * log(self.prior_sigma[d_prop]) - .5 * self.lambdank * log(sigmank_prop[:,0]))
+				else:
+					for k in range(self.K[key] if self.coclust else self.K):
+						old_lik += np.sum(gammaln(.5 * (self.nunk[k] + self.d - 1 - np.arange(self.d-d_prop))) - \
+							gammaln(.5 * (self.nu0 + self.d - 1 - np.arange(self.d-d_prop))))
+					for k in range(self.sigmank.shape[0]):
+						new_lik += np.sum(.5 * self.lambda0 * log(self.prior_sigma[np.arange(d_prop,self.d)]) - \
+							.5 * self.lambdank[k] * log(sigmank_prop[k,np.arange(self.d-d_prop)]))
 		## Acceptance ratio
 		accept_ratio = new_lik - old_lik + (d_prop - self.d) * log(1 - self.delta)
+		if prop_step == 1:
+			if self.d == 1 or d_prop == 1:
+				accept_ratio += (self.d - d_prop) * log(2)
+			if self.d == self.m or d_prop == self.m:
+				accept_ratio -= (self.d - d_prop) * log(2)
+		else:
+			accept_ratio += log(q_prop_new) - log(q_prop_old)
 		accept = ( -np.random.exponential(1) < accept_ratio )
-		### print str(exp(accept_ratio))
+		print str(exp(accept_ratio))
 		## If the proposal is accepted, update the parameters
 		if accept:
 			self.d = d_prop
@@ -1998,7 +2089,8 @@ class mcmc_sbm:
 								.5 * self.lambdank[key][k] * log(squares[key][k,d:]))
 							self.mlik[d] += (self.m - d) * (gammaln(.5 * self.lambdank[key][k]) - gammaln(.5 * self.lambda0[key]))
 							if self.equal_var:
-								self.mlik[d] += -.5 * (self.vk[key][k] if self.coclust else self.vk[k]) * (self.m - d) * log(np.pi)
+								self.mlik[d] += -.5 * (np.sum(self.nk[key][self.v[key] == k]) if self.coclust else np.sum(self.nk[self.v == k])) * \
+									(self.m - d) * log(np.pi)
 							else:
 								self.mlik[d] += -.5 * (self.nk[key][k] if self.coclust else self.nk[k]) * (self.m - d) * log(np.pi)
 				else:
@@ -2006,7 +2098,7 @@ class mcmc_sbm:
 						self.mlik[d] += np.sum(.5 * self.lambda0 * log(self.prior_sigma[d:]) - .5 * self.lambdank[k] * log(squares[k,d:]))
 						self.mlik[d] += (self.m - d) * (gammaln(.5 * self.lambdank[k]) - gammaln(.5 * self.lambda0))
 						if self.equal_var:
-							self.mlik[d] += -.5 * self.vk[k] * (self.m - d) * log(np.pi)
+							self.mlik[d] += -.5 * np.sum(self.nk[self.v == k]) * (self.m - d) * log(np.pi)
 						else:
 							self.mlik[d] += -.5 * self.nk[k] * (self.m - d) * log(np.pi)
 			else:
