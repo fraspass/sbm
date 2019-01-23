@@ -352,7 +352,7 @@ class mcmc_sbm:
 	########################################################
 	### a. Resample the allocations using Gibbs sampling ###
 	########################################################
-	def gibbs_communities(self,l=50):
+	def gibbs_communities(self,l=50):	
 		## For coclustering: Gibbs sample at random sources or receivers
 		if self.coclust:
 			sr = np.random.choice(['s','r'])
@@ -618,7 +618,7 @@ class mcmc_sbm:
 	###################################################
 	### b. Propose a change in the latent dimension ###
 	###################################################
-	def dimension_change(self,prop_step=1,delta_prop=0.2,verbose=False):
+	def dimension_change(self,prop_step=1,delta_prop=0.2,verbose=False):	
 		## Propose a new value of d
 		if prop_step == 1:
 			if self.d == 1:
@@ -675,7 +675,8 @@ class mcmc_sbm:
 			if self.directed:
 				for key in ['s','r']:
 					sum_x_prop[key] = np.hstack((self.sum_x[key], 
-						np.array([np.sum(self.X[key][(self.z[key] if self.coclust else self.z) == i][:,range(self.d,d_prop)],axis=0) \
+						np.array([np.zeros(d_prop-self.d) + \
+						np.sum(self.X[key][(self.z[key] if self.coclust else self.z) == i][:,range(self.d,d_prop)],axis=0) \
 						for i in range(self.K[key] if self.coclust else self.K)], ndmin=2)))
 					mean_k_prop[key] = np.divide((self.prior_sum[key][:d_prop] + sum_x_prop[key]).T, self.kappank[key]).T
 					for i in range(self.K[key] if self.coclust else self.K):
@@ -686,7 +687,8 @@ class mcmc_sbm:
 						if sign_det <= 0.0:
 							raise ValueError("Covariance matrix for d_prop is not invertible. Check conditions.")
 			else:
-				sum_x_prop = np.hstack((self.sum_x, np.array([np.sum(self.X[self.z == i][:,range(self.d,d_prop)],axis=0) for i in range(self.K)], ndmin=2).T))
+				sum_x_prop = np.hstack((self.sum_x, np.array([np.zeros(d_prop-self.d) + \
+					np.sum(self.X[self.z == i][:,range(self.d,d_prop)],axis=0) for i in range(self.K)], ndmin=2)))
 				mean_k_prop = np.divide((self.prior_sum[:d_prop] + sum_x_prop).T, self.kappank).T
 				for i in range(self.K):
 					squared_sum_x_prop[i] = self.full_outer_x[self.z == i,:d_prop,:d_prop].sum(axis=0)
@@ -1082,130 +1084,136 @@ class mcmc_sbm:
 				ind_right = np.where(z_prop == (self.K[sr] if self.coclust else self.K))[0]
 				if not self.directed or self.coclust:
 					if self.coclust:
-						lambda_left = np.copy(self.lambdank[sr])
+						lambda_left = np.append(self.lambdank[sr],self.lambda0[sr])
 						lambda_left[self.v[sr][zsplit]] -= nk_rest[0]
-						sigma_left = np.copy(self.sigmank[sr])
+						sigma_left = np.vstack((self.sigmank[sr],self.prior_sigma[sr][self.d:] * np.ones((1,self.m-self.d))))
 						sigma_left[self.v[sr][zsplit]] -= np.sum(self.X[sr][ind_left,self.d:] ** 2,axis=0)
-						prob_v_left = np.zeros(self.H[sr])
+						prob_v_left = np.zeros(self.H[sr]+1)
 						for node in np.random.permutation(ind_left):
 							pos = self.X[sr][node,self.d:]
 							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[h],loc=0, \
-								scale=sqrt(sigma_left[h]/lambda_left[h]))) for h in range(self.H[sr])])
+								scale=sqrt(sigma_left[h]/lambda_left[h]))) for h in range(self.H[sr]+1)])
 							lambda_left += 1.0
 							sigma_left += (pos ** 2)
 						## Calculate the second order allocation of the second cluster after splitting
-						lambda_right = np.copy(self.lambdank[sr])
+						lambda_right = np.append(self.lambdank[sr],self.lambda0[sr])
 						lambda_right[self.v[sr][zsplit]] -= nk_rest[1]
-						sigma_right = np.copy(self.sigmank[sr])
+						sigma_right = np.vstack((self.sigmank[sr],self.prior_sigma[sr][self.d:] * np.ones((1,self.m-self.d))))
 						sigma_right[self.v[sr][zsplit]] -= np.sum(self.X[sr][ind_right,self.d:] ** 2,axis=0)
-						prob_v_right = np.zeros(self.H[sr])
+						prob_v_right = np.zeros(self.H[sr]+1)
 						for node in np.random.permutation(ind_right):
 							pos = self.X[sr][node,self.d:]
 							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[h],loc=0, \
-								scale=sqrt(sigma_right[h]/lambda_right[h]))) for h in range(self.H[sr])])
+								scale=sqrt(sigma_right[h]/lambda_right[h]))) for h in range(self.H[sr]+1)])
 							lambda_right += 1.0
 							sigma_right += (pos ** 2)
 					else:
-						lambda_left = np.copy(self.lambdank)
+						lambda_left = np.append(self.lambdank,self.lambda0)
 						lambda_left[self.v[zsplit]] -= nk_rest[0]
-						sigma_left = np.copy(self.sigmank)
+						sigma_left = np.vstack((self.sigmank,self.prior_sigma[self.d:] * np.ones((1,self.m-self.d))))
 						sigma_left[self.v[zsplit]] -= np.sum(self.X[ind_left,self.d:] ** 2,axis=0)
-						prob_v_left = np.zeros(self.H)
+						prob_v_left = np.zeros(self.H+1)
 						for node in np.random.permutation(ind_left):
 							pos = self.X[node,self.d:]
-							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[h],loc=0,scale=sqrt(sigma_left[h]/lambda_left[h]))) for h in range(self.H)])
+							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[h],loc=0,
+								scale=sqrt(sigma_left[h]/lambda_left[h]))) for h in range(self.H+1)])
 							lambda_left += 1.0
 							sigma_left += (pos ** 2)
 						## Calculate the second order allocation of the second cluster after splitting
-						lambda_right = np.copy(self.lambdank)
+						lambda_right = np.append(self.lambdank,self.lambda0)
 						lambda_right[self.v[zsplit]] -= nk_rest[1]
-						sigma_right = np.copy(self.sigmank)
+						sigma_right = np.vstack((self.sigmank,self.prior_sigma[self.d:] * np.ones((1,self.m-self.d))))
 						sigma_right[self.v[zsplit]] -= np.sum(self.X[ind_right,self.d:] ** 2,axis=0)
-						prob_v_right = np.zeros(self.H)
+						prob_v_right = np.zeros(self.H+1)
 						for node in np.random.permutation(ind_right):
 							pos = self.X[node,self.d:]
-							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[h],loc=0,scale=sqrt(sigma_right[h]/lambda_right[h]))) for h in range(self.H)])
+							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[h],loc=0,
+								scale=sqrt(sigma_right[h]/lambda_right[h]))) for h in range(self.H+1)])
 							lambda_right += 1.0
 							sigma_right += (pos ** 2)
 				else:
 					## Directed graph - standard clustering
 					lambda_left = {}; sigma_left = {}
 					for key in ['s','r']:
-						lambda_left[key] = np.copy(self.lambdank[key])
+						lambda_left[key] = np.append(self.lambdank[key],self.lambda0[key])
 						lambda_left[key][self.v[zsplit]] -= nk_rest[0]
-						sigma_left[key] = np.copy(self.sigmank[key])
+						sigma_left[key] = np.vstack((self.sigmank[key],self.prior_sigma[key][self.d:] * np.ones((1,self.m-self.d))))
 						sigma_left[key][self.v[zsplit]] -= np.sum(self.X[key][ind_left,self.d:] ** 2,axis=0)
-					prob_v_left = np.zeros(self.H)
+					prob_v_left = np.zeros(self.H+1)
 					for node in np.random.permutation(ind_left):
 						for key in ['s','r']:
 							pos = self.X[key][node,self.d:]
 							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[key][h],loc=0,
-								scale=sqrt(sigma_left[key][h]/lambda_left[key][h]))) for h in range(self.H)])
+								scale=sqrt(sigma_left[key][h]/lambda_left[key][h]))) for h in range(self.H+1)])
 							lambda_left[key] += 1.0
 							sigma_left[key] += (pos ** 2)
 					## Calculate the second order allocation of the second cluster after splitting
 					lambda_right = {}; sigma_right = {}
 					for key in ['s','r']:
-						lambda_right[key] = np.copy(self.lambdank[key])
+						lambda_right[key] = np.append(self.lambdank[key],self.lambda0[key])
 						lambda_right[key][self.v[zsplit]] -= nk_rest[1]
-						sigma_right[key] = np.copy(self.sigmank[key])
+						sigma_right[key] = np.vstack((self.sigmank[key],self.prior_sigma[key][self.d:] * np.ones((1,self.m-self.d))))
 						sigma_right[key][self.v[zsplit]] -= np.sum(self.X[key][ind_right,self.d:] ** 2,axis=0)
-					prob_v_right = np.zeros(self.H)
+					prob_v_right = np.zeros(self.H+1)
 					for node in np.random.permutation(ind_right):
 						for key in ['s','r']:
 							pos = self.X[key][node,self.d:]
 							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[key][h],loc=0,
-								scale=sqrt(sigma_right[key][h]/lambda_right[key][h]))) for h in range(self.H)])
+								scale=sqrt(sigma_right[key][h]/lambda_right[key][h]))) for h in range(self.H+1)])
 							lambda_right[key] += 1.0
 							sigma_right[key] += (pos ** 2)
 			else:
 				if not self.directed or self.coclust:
 					if self.coclust:
 						## Calculate the new second order allocation of the first cluster after the (imaginary) split
-						lambda_left = np.copy(self.lambdank[sr])
+						lambda_left = np.append(self.lambdank[sr],self.lambda0[sr])
 						lambda_left[self.v[sr][zmerge]] -= self.nk[sr][zmerge]
-						sigma_left = np.copy(self.sigmank[sr])
+						sigma_left = np.vstack((self.sigmank[sr],self.prior_sigma[sr][self.d:] * np.ones((1,self.m-self.d))))
 						sigma_left[self.v[sr][zmerge]] -= np.sum(self.X[sr][self.z[sr] == zmerge,self.d:] ** 2,axis=0)
-						prob_v_left = np.zeros(self.H[sr])
+						prob_v_left = np.zeros(self.H[sr]+1)
 						for node in np.random.permutation(np.where(self.z[sr] == zmerge)[0]):
 							pos = self.X[sr][node,self.d:]
-							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[h],loc=0,scale=sqrt(sigma_left[h]/lambda_left[h]))) for h in range(self.H[sr])])
+							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[h],loc=0,
+								scale=sqrt(sigma_left[h]/lambda_left[h]))) for h in range(self.H[sr]+1)])
 							lambda_left += 1.0
 							sigma_left += (pos ** 2)
 						## Calculate the new second order allocation of the first cluster after the (imaginary) split
-						lambda_right = np.copy(self.lambdank[sr])
+						lambda_right = np.append(self.lambdank[sr],self.lambda0[sr])
 						lambda_right[self.v[sr][zlost]] -= self.nk[sr][zlost]
-						sigma_right = np.copy(self.sigmank[sr])
+						sigma_right = np.vstack((self.sigmank[sr],self.prior_sigma[sr][self.d:] * np.ones((1,self.m-self.d))))
 						sigma_right[self.v[sr][zlost]] -= np.sum(self.X[sr][self.z[sr] == zlost,self.d:] ** 2,axis=0)
-						prob_v_right = np.zeros(self.H[sr])
+						prob_v_right = np.zeros(self.H[sr]+1)
 						for node in np.random.permutation(np.where(self.z[sr] == zlost)[0]):
 							pos = self.X[sr][node,self.d:]
-							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[h],loc=0,scale=sqrt(sigma_right[h]/lambda_right[h]))) for h in range(self.H[sr])])
+							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[h],loc=0,
+								scale=sqrt(sigma_right[h]/lambda_right[h]))) for h in range(self.H[sr]+1)])
 							lambda_right += 1.0
 							sigma_right += (pos ** 2)
 					else:
 						## Directed graph - standard clustering
 						lambda_left = {}; sigma_left = {}		
 						## Calculate the new second order allocation of the first cluster after the (imaginary) split
-						lambda_left = np.copy(self.lambdank)
+						lambda_left = np.append(self.lambdank,self.lambda0)
 						lambda_left[self.v[zmerge]] -= self.nk[zmerge]
-						sigma_left = np.copy(self.sigmank)
+						sigma_left = np.vstack((self.sigmank,self.prior_sigma[self.d:] * np.ones((1,self.m-self.d))))
 						sigma_left[self.v[zmerge]] -= np.sum(self.X[self.z == zmerge,self.d:] ** 2,axis=0)
-						prob_v_left = np.zeros(self.H)
+						prob_v_left = np.zeros(self.H+1)
 						for node in np.random.permutation(np.where(self.z == zmerge)[0]):
 							pos = self.X[node,self.d:]
-							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[h],loc=0,scale=sqrt(sigma_left[h]/lambda_left[h]))) for h in range(self.H)])
+							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[h],loc=0,
+								scale=sqrt(sigma_left[h]/lambda_left[h]))) for h in range(self.H+1)])
 							lambda_left += 1.0
 							sigma_left += (pos ** 2)
 						## Calculate the new second order allocation of the first cluster after the (imaginary) split
-						lambda_right = np.copy(self.lambdank)
+						lambda_right = np.append(self.lambdank,self.lambda0)
 						lambda_right[self.v[zlost]] -= self.nk[zlost]
-						sigma_right = np.copy(self.sigmank)
+						sigma_right = np.vstack((self.sigmank,self.prior_sigma[self.d:] * np.ones((1,self.m-self.d))))
 						sigma_right[self.v[zlost]] -= np.sum(self.X[self.z == zlost,self.d:] ** 2,axis=0)
-						prob_v_right = np.zeros(self.H)
+						prob_v_right = np.zeros(self.H+1)
 						for node in np.random.permutation(np.where(self.z == zlost)[0]):
 							pos = self.X[node,self.d:]
-							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[h],loc=0,scale=sqrt(sigma_right[h]/lambda_right[h]))) for h in range(self.H)])
+							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[h],loc=0,
+								scale=sqrt(sigma_right[h]/lambda_right[h]))) for h in range(self.H+1)])
 							lambda_right += 1.0
 							sigma_right += (pos ** 2)
 				else:
@@ -1213,63 +1221,86 @@ class mcmc_sbm:
 					lambda_left = {}; sigma_left = {}
 					## Calculate the new second order allocation of the first cluster after the (imaginary) split
 					for key in ['s','r']:
-						lambda_left[key] = np.copy(self.lambdank[key])
+						lambda_left[key] = np.append(self.lambdank[key],self.lambda0[key])
 						lambda_left[key][self.v[zmerge]] -= self.nk[zmerge]
-						sigma_left[key] = np.copy(self.sigmank[key])
+						sigma_left[key] = np.vstack((self.sigmank[key],self.prior_sigma[key][self.d:] * np.ones((1,self.m-self.d))))
 						sigma_left[key][self.v[zmerge]] -= np.sum(self.X[key][self.z == zmerge,self.d:] ** 2,axis=0)
-					prob_v_left = np.zeros(self.H)
+					prob_v_left = np.zeros(self.H+1)
 					for node in np.random.permutation(np.where(self.z == zmerge)[0]):
 						for key in ['s','r']:
 							pos = self.X[key][node,self.d:]
 							prob_v_left += np.array([np.sum(t.logpdf(pos,df=lambda_left[key][h],loc=0,
-								scale=sqrt(sigma_left[key][h]/lambda_left[key][h]))) for h in range(self.H)])
+								scale=sqrt(sigma_left[key][h]/lambda_left[key][h]))) for h in range(self.H+1)])
 							lambda_left[key] += 1.0
 							sigma_left[key] += (pos ** 2)
 					## Calculate the new second order allocation of the first cluster after the (imaginary) split
 					lambda_right = {}; sigma_right = {}
 					for key in ['s','r']:
-						lambda_right[key] = np.copy(self.lambdank[key])
+						lambda_right[key] = np.append(self.lambdank[key],self.lambdank[key])
 						lambda_right[key][self.v[zlost]] -= self.nk[zlost]
-						sigma_right[key] = np.copy(self.sigmank[key])
+						sigma_right[key] = np.vstack((self.sigmank[key],self.prior_sigma[key][self.d:] * np.ones((1,self.m-self.d))))
 						sigma_right[key][self.v[zlost]] -= np.sum(self.X[key][self.z == zlost,self.d:] ** 2,axis=0)
-					prob_v_right = np.zeros(self.H)
+					prob_v_right = np.zeros(self.H+1)
 					for node in np.random.permutation(np.where(self.z == zlost)[0]):
 						for key in ['s','r']:
 							pos = self.X[key][node,self.d:]
 							prob_v_right += np.array([np.sum(t.logpdf(pos,df=lambda_right[key][h],loc=0,
-								scale=sqrt(sigma_right[key][h]/lambda_right[key][h]))) for h in range(self.H)])
+								scale=sqrt(sigma_right[key][h]/lambda_right[key][h]))) for h in range(self.H+1)])
 							lambda_right[key] += 1.0
 							sigma_right[key] += (pos ** 2)
 			## Resample the second order cluster allocation
 			prob_v_left = exp(prob_v_left-max(prob_v_left)) / np.sum(exp(prob_v_left-np.max(prob_v_left)))
-			left_sord = np.random.choice(range(self.H[sr] if self.coclust else self.H),p=prob_v_left)
+			left_sord = np.random.choice(range((self.H[sr] if self.coclust else self.H)+1),p=prob_v_left)
 			prob_v_right = exp(prob_v_right-max(prob_v_right)) / np.sum(exp(prob_v_right-max(prob_v_right)))
-			right_sord = np.random.choice(range(self.H[sr] if self.coclust else self.H),p=prob_v_right)
+			right_sord = np.random.choice(range((self.H[sr] if self.coclust else self.H)+1),p=prob_v_right)
 			## Calculate the cumulative probability of allocation to the specific pair (left_sord and right_sord)
 			prob_second_order = log(prob_v_left[left_sord]) + log(prob_v_right[right_sord])
 			## Compute the proposed values of lambdank and sigmank
 			if not self.directed or self.coclust:
 				if self.coclust:
-					lambdank_prop = np.copy(self.lambdank[sr])
-					sigmank_prop = np.copy(self.sigmank[sr])
-					v_prop = np.copy(self.v[sr])
-					vk_prop = np.copy(self.vk[sr])
+					if split:
+						lambdank_prop = np.append(self.lambdank[sr],self.lambda0[sr]) if (left_sord == self.H or right_sord == self.H) else np.copy(self.lambdank[sr])
+						sigmank_prop = np.vstack((self.sigmank[sr],self.prior_sigma[sr][self.d:] * \
+							np.ones((1,self.m-self.d)))) if (left_sord == self.H or right_sord == self.H) else np.copy(self.sigmank[sr])
+						v_prop = np.copy(self.v[sr])
+						vk_prop = np.append(self.vk[sr],0) if (left_sord == self.H or right_sord == self.H) else np.copy(self.vk[sr])
+					else:
+						lambdank_prop = np.copy(self.lambdank[sr])
+						sigmank_prop = np.copy(self.sigmank[sr])
+						v_prop = np.copy(self.v[sr])
+						vk_prop = np.copy(self.vk[sr]) 
 				else:
-					lambdank_prop = np.copy(self.lambdank)
-					sigmank_prop = np.copy(self.sigmank)
-					v_prop = np.copy(self.v)
-					vk_prop = np.copy(self.vk)
+					if split:
+						lambdank_prop = np.append(self.lambdank,self.lambda0) if (left_sord == self.H or right_sord == self.H) else np.copy(self.lambdank)
+						sigmank_prop = np.vstack((self.sigmank,self.prior_sigma[self.d:] * \
+							np.ones((1,self.m-self.d)))) if (left_sord == self.H or right_sord == self.H) else np.copy(self.sigmank)
+						v_prop = np.copy(self.v)
+						vk_prop = np.append(self.vk,0) if (left_sord == self.H or right_sord == self.H) else np.copy(self.vk)
+					else:
+						lambdank_prop = np.copy(self.lambdank)
+						sigmank_prop = np.copy(self.sigmank)
+						v_prop = np.copy(self.v)
+						vk_prop = np.copy(self.vk)
 			else:
 				lambdank_prop = {}; sigmank_prop = {}
 				for key in ['s','r']:
-					lambdank_prop[key] = np.copy(self.lambdank[key])
-					sigmank_prop[key] = np.copy(self.sigmank[key])
+					if split:
+						lambdank_prop[key] = np.append(self.lambdank[key],self.lambda0[key]) if (left_sord == self.H or right_sord == self.H) else np.copy(self.lambdank[key])
+						sigmank_prop[key] = np.vstack((self.sigmank[key],self.prior_sigma[key][self.d:] * \
+							np.ones((1,self.m-self.d)))) if (left_sord == self.H or right_sord == self.H) else np.copy(self.sigmank[key])
+					else:
+						lambdank_prop[key] = np.copy(self.lambdank[key])
+						sigmank_prop[key] = np.copy(self.sigmank[key])
 				v_prop = np.copy(self.v)
-				vk_prop = np.copy(self.vk)
+				if split:
+					vk_prop = np.append(self.vk,0) if (left_sord == self.H or right_sord == self.H) else np.copy(self.vk)
+				else:
+					vk_prop = np.copy(self.vk)
 			if split:
 				## Propose new values for the right hand side of the matrix
 				v_prop[zsplit] = left_sord
 				v_prop = np.append(v_prop,right_sord)
+				H_prop = self.H if (left_sord != self.H and right_sord != self.H) else (self.H+1)
 				## Second order cluster counts
 				vk_prop[self.v[sr][zsplit] if self.coclust else self.v[zsplit]] -= 1.0
 				vk_prop[left_sord] += 1.0
@@ -1304,6 +1335,20 @@ class mcmc_sbm:
 				second_order = [self.v[sr][zmerge],self.v[sr][zlost]][samp_so] if self.coclust else [self.v[zmerge],self.v[zlost]][samp_so]
 				v_prop[zmerge] = second_order
 				vk_prop[[self.v[sr][zmerge],self.v[sr][zlost]][1-samp_so] if self.coclust else [self.v[zmerge],self.v[zlost]][1-samp_so]] -= 1.0
+				if vk_prop[[self.v[sr][zmerge],self.v[sr][zlost]][1-samp_so] if self.coclust else [self.v[zmerge],self.v[zlost]][1-samp_so]] == 0.0:
+					remove_second_order = True
+					v_del = [self.v[sr][zmerge],self.v[sr][zlost]][1-samp_so] if self.coclust else [self.v[zmerge],self.v[zlost]][1-samp_so]
+					vk_prop = np.delete(vk_prop,v_del)
+					H_prop = self.H-1
+					if v_del != H_prop:
+						for h in range(v_del,H_prop):
+							if self.coclust:
+								v_prop[v_prop == h+1] = h
+							else:
+								v_prop[v_prop == h+1] = h
+				else:
+					H_prop = self.H
+					remove_second_order = False
 				if not self.directed or self.coclust:
 					if self.coclust:
 						lambdank_prop[self.v[sr][zmerge]] -= self.nk[sr][zmerge]
@@ -1313,7 +1358,7 @@ class mcmc_sbm:
 						Xzl = np.sum(self.X[sr][self.z[sr] == zlost, self.d:] ** 2, axis=0)
 						sigmank_prop[self.v[sr][zmerge]] -= Xzm
 						sigmank_prop[self.v[sr][zlost]] -= Xzl
-						sigmank_prop[second_order] += Xzm + Xzl
+						sigmank_prop[second_order] += Xzm + Xzl			
 					else:
 						lambdank_prop[self.v[zmerge]] -= self.nk[zmerge]
 						lambdank_prop[self.v[zlost]] -= self.nk[zlost]
@@ -1323,6 +1368,9 @@ class mcmc_sbm:
 						sigmank_prop[self.v[zmerge]] -= Xzm
 						sigmank_prop[self.v[zlost]] -= Xzl
 						sigmank_prop[second_order] += Xzm + Xzl
+					if remove_second_order:
+						lambdank_prop = np.delete(lambdank_prop,v_del)
+						sigmank_prop = np.delete(sigmank_prop,v_del,axis=0)	
 				else:
 					for key in ['s','r']:
 						lambdank_prop[key][self.v[zmerge]] -= self.nk[zmerge]
@@ -1333,6 +1381,9 @@ class mcmc_sbm:
 						sigmank_prop[key][self.v[zmerge]] -= Xzm
 						sigmank_prop[key][self.v[zlost]] -= Xzl
 						sigmank_prop[key][second_order] += Xzm + Xzl
+						if remove_second_order:
+							lambdank_prop[key] = np.delete(lambdank_prop[key],v_del)
+							sigmank_prop[key] = np.delete(sigmank_prop[key],v_del,axis=0)	
 		## Calculate the acceptance probability
 		if split:
 			## Calculate the acceptance ratio
@@ -1366,28 +1417,29 @@ class mcmc_sbm:
 				if not self.directed or self.coclust:
 					if self.coclust:
 						accept_ratio += np.sum([(self.m - self.d) * (gammaln(.5 * lambdank_prop[h]) - gammaln(.5 * self.lambda0[sr])) + \
-							np.sum(.5*self.lambda0[sr]*log(self.prior_sigma[sr][self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(self.H[sr])])
+							np.sum(.5*self.lambda0[sr]*log(self.prior_sigma[sr][self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(H_prop)])
 						accept_ratio -= np.sum([(self.m - self.d) * (gammaln(.5 * self.lambdank[sr][h]) - gammaln(.5 * self.lambda0[sr])) + \
 							np.sum(.5*self.lambda0[sr]*log(self.prior_sigma[sr][self.d:]) - .5*self.lambdank[sr][h]*log(self.sigmank[sr][h])) for h in range(self.H[sr])])
-						accept_ratio += np.sum(gammaln(vk_prop + self.beta[sr] / self.H[sr])) - np.sum(gammaln(self.vk[sr] + self.beta[sr] / self.H[sr])) + \
-							gammaln(self.K[sr] + self.beta[sr]) - gammaln(self.K[sr] + 1 + self.beta[sr])
+						accept_ratio += np.sum(gammaln(vk_prop + self.beta[sr] / H_prop)) - np.sum(gammaln(self.vk[sr] + self.beta[sr] / self.H[sr])) + \
+							gammaln(self.K[sr] + self.beta[sr]) - gammaln(self.K[sr] + 1 + self.beta[sr]) + \
+							gammaln(self.beta[sr] / self.H) - gammaln(self.beta[sr] / H_prop)
 						accept_ratio -= prob_second_order
 					else:
 						accept_ratio += np.sum([(self.m - self.d) * (gammaln(.5 * lambdank_prop[h]) - gammaln(.5 * self.lambda0)) + \
-							np.sum(.5*self.lambda0*log(self.prior_sigma[self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(self.H)])
+							np.sum(.5*self.lambda0*log(self.prior_sigma[self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(H_prop)])
 						accept_ratio -= np.sum([(self.m - self.d) * (gammaln(.5 * self.lambdank[h]) - gammaln(.5 * self.lambda0)) + \
 							np.sum(.5*self.lambda0*log(self.prior_sigma[self.d:]) - .5*self.lambdank[h]*log(self.sigmank[h])) for h in range(self.H)])
-						accept_ratio += np.sum(gammaln(vk_prop + self.beta / self.H)) - np.sum(gammaln(self.vk + self.beta / self.H)) + gammaln(self.K + self.beta) - \
-							gammaln(self.K + 1 + self.beta)
+						accept_ratio += np.sum(gammaln(vk_prop + self.beta / H_prop)) - np.sum(gammaln(self.vk + self.beta / self.H)) + gammaln(self.K + self.beta) - \
+							gammaln(self.K + 1 + self.beta) + gammaln(self.beta / self.H) - gammaln(self.beta / H_prop)
 						accept_ratio -= prob_second_order
 				else:
 					for key in ['s','r']:
 						accept_ratio += np.sum([(self.m - self.d) * (gammaln(.5 * lambdank_prop[key][h]) - gammaln(.5 * self.lambda0[key])) + \
-							np.sum(.5*self.lambda0[key]*log(self.prior_sigma[key][self.d:]) - .5*lambdank_prop[key][h]*log(sigmank_prop[key][h])) for h in range(self.H)])
+							np.sum(.5*self.lambda0[key]*log(self.prior_sigma[key][self.d:]) - .5*lambdank_prop[key][h]*log(sigmank_prop[key][h])) for h in range(H_prop)])
 						accept_ratio -= np.sum([(self.m - self.d) * (gammaln(.5 * self.lambdank[key][h]) - gammaln(.5 * self.lambda0[key])) + \
 							np.sum(.5*self.lambda0[key]*log(self.prior_sigma[key][self.d:]) - .5*self.lambdank[key][h]*log(self.sigmank[key][h])) for h in range(self.H)])
-					accept_ratio += np.sum(gammaln(vk_prop + self.beta / self.H)) - np.sum(gammaln(self.vk + self.beta / self.H)) + \
-						gammaln(self.K + self.beta) - gammaln(self.K + 1 + self.beta)
+					accept_ratio += np.sum(gammaln(vk_prop + self.beta / H_prop)) - np.sum(gammaln(self.vk + self.beta / self.H)) + \
+						gammaln(self.K + self.beta) - gammaln(self.K + 1 + self.beta) + gammaln(self.beta / self.H) - gammaln(self.beta / H_prop)
 					accept_ratio -= prob_second_order
 			else:
 				if not self.directed or self.coclust:
@@ -1442,11 +1494,12 @@ class mcmc_sbm:
 					## Right hand side of matrix
 					if self.equal_var:
 						accept_ratio += np.sum([(self.m - self.d) * (gammaln(.5 * lambdank_prop[h]) - gammaln(.5 * self.lambda0[sr])) + \
-							np.sum(.5*self.lambda0[sr]*log(self.prior_sigma[sr][self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(self.H[sr])])
+							np.sum(.5*self.lambda0[sr]*log(self.prior_sigma[sr][self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(H_prop)])
 						accept_ratio -= np.sum([(self.m - self.d) * (gammaln(.5 * self.lambdank[sr][h]) - gammaln(.5 * self.lambda0[sr])) + \
 							np.sum(.5*self.lambda0[sr]*log(self.prior_sigma[sr][self.d:]) - .5*self.lambdank[sr][h]*log(self.sigmank[sr][h])) for h in range(self.H[sr])])
-						accept_ratio += np.sum(gammaln(vk_prop + self.beta[sr] / self.H[sr])) - np.sum(gammaln(self.vk[sr] + self.beta[sr] / self.H[sr])) + \
-							gammaln(self.K[sr] + self.beta[sr]) - gammaln(self.K[sr] - 1 + self.beta[sr])
+						accept_ratio += np.sum(gammaln(vk_prop + self.beta[sr] / H_prop)) - np.sum(gammaln(self.vk[sr] + self.beta[sr] / self.H[sr])) + \
+							gammaln(self.K[sr] + self.beta[sr]) - gammaln(self.K[sr] - 1 + self.beta[sr]) + \
+							gammaln(self.beta[sr] / self.H) - gammaln(self.beta[sr] / H_prop)
 						accept_ratio += prob_second_order - (self.v[sr][zmerge] != self.v[sr][zlost])*log(.5)
 					else:
 						accept_ratio -= (self.m - self.d) * (np.sum(gammaln(.5 * self.lambdank[sr][[zmerge,zlost]])) - gammaln(.5 * self.lambda0[sr]) - \
@@ -1476,11 +1529,11 @@ class mcmc_sbm:
 					## Right hand side of matrix
 					if self.equal_var:
 						accept_ratio += np.sum([(self.m - self.d) * (gammaln(.5 * lambdank_prop[h]) - gammaln(.5 * self.lambda0)) + \
-							np.sum(.5*self.lambda0*log(self.prior_sigma[self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(self.H)])
+							np.sum(.5*self.lambda0*log(self.prior_sigma[self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(H_prop)])
 						accept_ratio -= np.sum([(self.m - self.d) * (gammaln(.5 * self.lambdank[h]) - gammaln(.5 * self.lambda0)) + \
 							np.sum(.5*self.lambda0*log(self.prior_sigma[self.d:]) - .5*self.lambdank[h]*log(self.sigmank[h])) for h in range(self.H)])
-						accept_ratio += np.sum(gammaln(vk_prop + self.beta / self.H)) - np.sum(gammaln(self.vk + self.beta / self.H)) + gammaln(self.K + self.beta) - \
-								gammaln(self.K - 1 + self.beta)
+						accept_ratio += np.sum(gammaln(vk_prop + self.beta / H_prop)) - np.sum(gammaln(self.vk + self.beta / self.H)) + gammaln(self.K + self.beta) - \
+								gammaln(self.K - 1 + self.beta) + gammaln(self.beta / self.H) - gammaln(self.beta / H_prop)
 						accept_ratio += prob_second_order - (self.v[zmerge] != self.v[zlost])*log(.5)
 					else:
 						accept_ratio -= (self.m - self.d) * (np.sum(gammaln(.5 * self.lambdank[[zmerge,zlost]])) - gammaln(.5 * self.lambda0) - \
@@ -1516,12 +1569,12 @@ class mcmc_sbm:
 					for key in ['s','r']:
 						accept_ratio += np.sum([(self.m - self.d) * (gammaln(.5 * lambdank_prop[key][h]) - gammaln(.5 * self.lambda0[key])) + \
 							np.sum(.5*self.lambda0[key]*log(self.prior_sigma[key][self.d:]) - \
-							.5*lambdank_prop[key][h]*log(sigmank_prop[key][h])) for h in range(self.H)])
+							.5*lambdank_prop[key][h]*log(sigmank_prop[key][h])) for h in range(H_prop)])
 						accept_ratio -= np.sum([(self.m - self.d) * (gammaln(.5 * self.lambdank[key][h]) - gammaln(.5 * self.lambda0[key])) + \
 							np.sum(.5*self.lambda0[key]*log(self.prior_sigma[key][self.d:]) - \
 							.5*self.lambdank[key][h]*log(self.sigmank[key][h])) for h in range(self.H)])
-					accept_ratio += np.sum(gammaln(vk_prop + self.beta / self.H)) - np.sum(gammaln(self.vk + self.beta / self.H)) + gammaln(self.K + self.beta) - \
-								gammaln(self.K - 1 + self.beta)
+					accept_ratio += np.sum(gammaln(vk_prop + self.beta / H_prop)) - np.sum(gammaln(self.vk + self.beta / self.H)) + gammaln(self.K + self.beta) - \
+								gammaln(self.K - 1 + self.beta) + gammaln(self.beta / self.H) - gammaln(self.beta / H_prop)
 					accept_ratio += prob_second_order - (self.v[zmerge] != self.v[zlost])*log(.5)
 				else:
 					for key in ['s','r']:
@@ -1565,6 +1618,7 @@ class mcmc_sbm:
 							self.vk[sr] = vk_prop		
 							self.lambdank[sr] = lambdank_prop
 							self.sigmank[sr] = sigmank_prop
+							self.H[sr] = H_prop
 						else:
 							self.lambdank[sr] = self.lambda0[sr] + self.nk[sr]
 							self.sigmank[sr][zsplit] = sigma_rest[0]
@@ -1593,6 +1647,7 @@ class mcmc_sbm:
 							self.vk = vk_prop		
 							self.lambdank = lambdank_prop
 							self.sigmank = sigmank_prop
+							self.H = H_prop
 						else:
 							self.lambdank = self.lambda0 + self.nk
 							self.sigmank[zsplit] = sigma_rest[0]
@@ -1618,6 +1673,7 @@ class mcmc_sbm:
 						self.sum_x[key][zsplit] = sum_rest[key][0]
 						self.sum_x[key] = np.vstack((self.sum_x[key],sum_rest[key][1]))
 					if self.equal_var:
+						self.H = H_prop
 						self.v = v_prop
 						self.vk = vk_prop	
 						for key in ['s','r']:	
@@ -1638,7 +1694,7 @@ class mcmc_sbm:
 						self.Delta_k_inv[key][self.K] = Delta_restricted_inv[key][1]
 						self.Delta_k_det[key][zsplit] = Delta_restricted_det[key][0]
 						self.Delta_k_det[key] = np.append(self.Delta_k_det[key],Delta_restricted_det[key][1])
-					## Update K 
+					## Update K and H
 					self.K += 1
 			else:
 				if not self.directed or self.coclust:
@@ -1653,6 +1709,7 @@ class mcmc_sbm:
 							self.vk[sr] = vk_prop
 							self.lambdank[sr] = lambdank_prop
 							self.sigmank[sr] = sigmank_prop
+							self.H[sr] = H_prop
 						else:
 							self.lambdank[sr][zmerge] = self.lambda0[sr] + self.nk[sr][zmerge]
 							self.sigmank[sr][zmerge] += self.sigmank[sr][zlost] - self.prior_sigma[sr][self.d:]
@@ -1699,6 +1756,7 @@ class mcmc_sbm:
 							self.vk = vk_prop
 							self.lambdank = lambdank_prop
 							self.sigmank = sigmank_prop
+							self.H = H_prop
 						else:
 							self.lambdank[zmerge] = self.lambda0 + self.nk[zmerge]
 							self.sigmank[zmerge] += self.sigmank[zlost] - self.prior_sigma[self.d:]
@@ -1742,6 +1800,7 @@ class mcmc_sbm:
 						self.kappank[key][zmerge] = self.kappa0[key] + self.nk[zmerge]
 						self.sum_x[key][zmerge] += self.sum_x[key][zlost]
 					if self.equal_var:
+						self.H = H_prop
 						self.v = v_prop
 						self.vk = vk_prop
 						for key in ['s','r']:
@@ -1798,7 +1857,7 @@ class mcmc_sbm:
 	########################################################
 	### d. Propose to add (or delete) an empty component ###
 	########################################################
-	def propose_empty(self,verbose=False):
+	def propose_empty(self,verbose=False):	
 		## For coclustering: Gibbs sample at random sources or receivers
 		if self.coclust:
 			sr = np.random.choice(['s','r'])
@@ -2122,7 +2181,7 @@ class mcmc_sbm:
 	######################################################################
 	### 2a. Resample the second order allocations using Gibbs sampling ###
 	######################################################################
-	def gibbs_second_order(self):
+	def gibbs_second_order(self):	
 		## Stop if equal_var is set to false
 		if not self.equal_var:
 			raise ValueError('equal_var is set to false')
@@ -2217,7 +2276,7 @@ class mcmc_sbm:
 	###############################################################
 	### 2b. Propose to split (or merge) two second order groups ###
 	###############################################################
-	def split_merge_second_order(self,verbose=False):
+	def split_merge_second_order(self,verbose=False):	
 		## Stop if equal_var is set to false
 		if not self.equal_var:
 			raise ValueError('equal_var is set to false')
@@ -2431,8 +2490,8 @@ class mcmc_sbm:
 							np.sum(.5*self.lambda0[key]*log(self.prior_sigma[key][self.d:]) - .5*lambdank_prop[key][h]*log(sigmank_prop[key][h])) for h in range(H_prop)])
 					accept_ratio -= np.sum([(self.m - self.d) * (gammaln(.5 * self.lambdank[key][h]) - gammaln(.5 * self.lambda0[key])) + \
 							np.sum(.5*self.lambda0[key]*log(self.prior_sigma[key][self.d:]) - .5*self.lambdank[key][h]*log(self.sigmank[key][h])) for h in range(self.H)])
-					accept_ratio += np.sum(gammaln(vk_prop + self.beta / self.H)) - np.sum(gammaln(self.vk + self.beta / self.H)) + \
-							gammaln(self.K + self.beta) - gammaln(self.K + 1 + self.beta)
+				accept_ratio += np.sum(gammaln(vk_prop + self.beta / self.H)) - np.sum(gammaln(self.vk + self.beta / self.H)) + \
+						gammaln(self.K + self.beta) - gammaln(self.K + 1 + self.beta)
 			else:
 				accept_ratio += np.sum([(self.m - self.d) * (gammaln(.5 * lambdank_prop[h]) - gammaln(.5 * self.lambda0)) + \
 							np.sum(.5*self.lambda0*log(self.prior_sigma[self.d:]) - .5*lambdank_prop[h]*log(sigmank_prop[h])) for h in range(H_prop)])
@@ -2473,7 +2532,7 @@ class mcmc_sbm:
 	######################################################################
 	### 2c. Propose to add (or delete) an empty second order component ###
 	######################################################################
-	def propose_empty_second_order(self,verbose=False):
+	def propose_empty_second_order(self,verbose=False):	
 		## Stop if equal_var is set to false
 		if not self.equal_var:
 			raise ValueError('equal_var is set to false')
@@ -2570,31 +2629,3 @@ class mcmc_sbm:
 		#if (vvv != self.vk).any():
 		#	raise ValueError('Error with vs')
 		return None
-
-	###################################################################################################
-	### Maximise PEAR (posterior expected adjusted Rand index) from the posterior similarity matrix ###
-	###################################################################################################
-	# Import required packages
-	#from rpy2.robjects.packages import importr
-	#import rpy2.robjects as ro
-	#import rpy2.robjects.numpy2ri
-	#from sklearn.cluster import AgglomerativeClustering 
-	# Import R's packages
-	#base = importr('base')
-	#utils = importr('utils')
-	#mcclust = importr('mcclust')
-	#rpy2.robjects.numpy2ri.activate()
-	## The function takes the posterior similarity matrix (psm) as argument (obtained from MCMC chains)
-	#def estimate_clustering(psm,k=None):
-	#	if k is None:
-	#		## If k is not specified, maxpear is used -- from the R package 'mcclust' (Fritsch and Ickstadt, 2009) 
-	#		Br = ro.r.matrix(psm, nrow=psm.shape[0], ncol=psm.shape[1])
-	#		ro.r.assign("B", Br)
-	#		cl = mcclust.maxpear(Br)
-	#		clust = np.array(cl[cl.names.index('cl')])
-	#	else:
-	#		## If k is specified, use agglomerative clustering 
-	#		cluster_model = AgglomerativeClustering(n_clusters=int(k), affinity='precomputed', linkage='average') 
-	#		clust = cluster_model.fit_predict(1-psm).labels_
-	#	return clust
-
