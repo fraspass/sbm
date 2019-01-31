@@ -1259,11 +1259,11 @@ class mcmc_sbm:
 			if not self.directed or self.coclust:
 				if self.coclust:
 					if split:
-						lambdank_prop = np.append(self.lambdank[sr],self.lambda0[sr]) if (left_sord == self.H or right_sord == self.H) else np.copy(self.lambdank[sr])
+						lambdank_prop = np.append(self.lambdank[sr],self.lambda0[sr]) if (left_sord == self.H[sr] or right_sord == self.H[sr]) else np.copy(self.lambdank[sr])
 						sigmank_prop = np.vstack((self.sigmank[sr],self.prior_sigma[sr][self.d:] * \
-							np.ones((1,self.m-self.d)))) if (left_sord == self.H or right_sord == self.H) else np.copy(self.sigmank[sr])
+							np.ones((1,self.m-self.d)))) if (left_sord == self.H[sr] or right_sord == self.H[sr]) else np.copy(self.sigmank[sr])
 						v_prop = np.copy(self.v[sr])
-						vk_prop = np.append(self.vk[sr],0) if (left_sord == self.H or right_sord == self.H) else np.copy(self.vk[sr])
+						vk_prop = np.append(self.vk[sr],0) if (left_sord == self.H[sr] or right_sord == self.H[sr]) else np.copy(self.vk[sr])
 					else:
 						lambdank_prop = np.copy(self.lambdank[sr])
 						sigmank_prop = np.copy(self.sigmank[sr])
@@ -1300,7 +1300,10 @@ class mcmc_sbm:
 				## Propose new values for the right hand side of the matrix
 				v_prop[zsplit] = left_sord
 				v_prop = np.append(v_prop,right_sord)
-				H_prop = self.H if (left_sord != self.H and right_sord != self.H) else (self.H+1)
+				if self.coclust:
+					H_prop = self.H[sr] if (left_sord != self.H[sr] and right_sord != self.H[sr]) else (self.H[sr]+1)
+				else:
+					H_prop = self.H if (left_sord != self.H and right_sord != self.H) else (self.H+1)
 				## Second order cluster counts
 				vk_prop[self.v[sr][zsplit] if self.coclust else self.v[zsplit]] -= 1.0
 				vk_prop[left_sord] += 1.0
@@ -1339,15 +1342,12 @@ class mcmc_sbm:
 					remove_second_order = True
 					v_del = [self.v[sr][zmerge],self.v[sr][zlost]][1-samp_so] if self.coclust else [self.v[zmerge],self.v[zlost]][1-samp_so]
 					vk_prop = np.delete(vk_prop,v_del)
-					H_prop = self.H-1
+					H_prop = (self.H[sr] if self.coclust else self.H) - 1 
 					if v_del != H_prop:
 						for h in range(v_del,H_prop):
-							if self.coclust:
-								v_prop[v_prop == h+1] = h
-							else:
-								v_prop[v_prop == h+1] = h
+							v_prop[v_prop == h+1] = h
 				else:
-					H_prop = self.H
+					H_prop = self.H[sr] if self.coclust else self.H
 					remove_second_order = False
 				if not self.directed or self.coclust:
 					if self.coclust:
@@ -1422,7 +1422,7 @@ class mcmc_sbm:
 							np.sum(.5*self.lambda0[sr]*log(self.prior_sigma[sr][self.d:]) - .5*self.lambdank[sr][h]*log(self.sigmank[sr][h])) for h in range(self.H[sr])])
 						accept_ratio += np.sum(gammaln(vk_prop + self.beta[sr] / H_prop)) - np.sum(gammaln(self.vk[sr] + self.beta[sr] / self.H[sr])) + \
 							gammaln(self.K[sr] + self.beta[sr]) - gammaln(self.K[sr] + 1 + self.beta[sr]) + \
-							gammaln(self.beta[sr] / self.H) - gammaln(self.beta[sr] / H_prop)
+							gammaln(self.beta[sr] / self.H[sr]) - gammaln(self.beta[sr] / H_prop)
 						accept_ratio -= prob_second_order
 					else:
 						accept_ratio += np.sum([(self.m - self.d) * (gammaln(.5 * lambdank_prop[h]) - gammaln(.5 * self.lambda0)) + \
@@ -1499,7 +1499,7 @@ class mcmc_sbm:
 							np.sum(.5*self.lambda0[sr]*log(self.prior_sigma[sr][self.d:]) - .5*self.lambdank[sr][h]*log(self.sigmank[sr][h])) for h in range(self.H[sr])])
 						accept_ratio += np.sum(gammaln(vk_prop + self.beta[sr] / H_prop)) - np.sum(gammaln(self.vk[sr] + self.beta[sr] / self.H[sr])) + \
 							gammaln(self.K[sr] + self.beta[sr]) - gammaln(self.K[sr] - 1 + self.beta[sr]) + \
-							gammaln(self.beta[sr] / self.H) - gammaln(self.beta[sr] / H_prop)
+							gammaln(self.beta[sr] / self.H[sr]) - gammaln(self.beta[sr] / H_prop)
 						accept_ratio += prob_second_order - (self.v[sr][zmerge] != self.v[sr][zlost])*log(.5)
 					else:
 						accept_ratio -= (self.m - self.d) * (np.sum(gammaln(.5 * self.lambdank[sr][[zmerge,zlost]])) - gammaln(.5 * self.lambda0[sr]) - \
@@ -2452,9 +2452,9 @@ class mcmc_sbm:
 			for h in range(H_prop):
 				## Second order cluster counts
 				vk_prop[h] = np.sum(v_prop == h)
-				lambdank_prop[h] = (self.lambda0[sr] + np.sum(self.nk[sr][v_prop==h]))  if self.coclust else (self.lambda0 + np.sum(self.nk[v_prop==h])) 
-				sigmank_prop[h] = (self.prior_sigma[sr][self.d:] + np.sum(self.X[sr][v_prop[self.z[sr]]==h, self.d:]**2, \
-						axis=0)) if self.coclust else (self.prior_sigma[self.d:] + np.sum(self.X[v_prop[self.z]==h, self.d:]**2, axis=0))
+				lambdank_prop[h] = (self.lambda0[sr] + np.sum(self.nk[sr][v_prop == h])) if self.coclust else (self.lambda0 + np.sum(self.nk[v_prop==h])) 
+				sigmank_prop[h] = (self.prior_sigma[sr][self.d:] + np.sum(self.X[sr][v_prop[self.z[sr]] == h, self.d:] ** 2, \
+						axis=0)) if self.coclust else (self.prior_sigma[self.d:] + np.sum(self.X[v_prop[self.z] == h, self.d:] ** 2, axis=0))
 		else:
 			vk_prop = np.zeros(H_prop)
 			for h in range(H_prop):
@@ -2466,7 +2466,7 @@ class mcmc_sbm:
 				for h in range(H_prop):
 				## Second order cluster counts
 					lambdank_prop[key][h] = self.lambda0[key] + np.sum(self.nk[v_prop == h])
-					sigmank_prop[key][h] = self.prior_sigma[key][self.d:] + np.sum(self.X[key][v_prop[self.z] == h, self.d:]**2, axis=0)
+					sigmank_prop[key][h] = self.prior_sigma[key][self.d:] + np.sum(self.X[key][v_prop[self.z] == h, self.d:] ** 2, axis=0)
 		#### Alternative way to evaluate sigma_prop for the undirected graph
 		#if split:
 		#	sigmank_prop[vsplit] = sigma_rest[0]
@@ -2500,7 +2500,7 @@ class mcmc_sbm:
 				accept_ratio += np.sum(gammaln(vk_prop + self.beta / self.H)) - np.sum(gammaln(self.vk + self.beta / self.H)) + gammaln(self.K + self.beta) - \
 							gammaln(self.K + 1 + self.beta)
 		# Prior on H and q function
-		accept_ratio += (1 if split else -1) * prop_ratio ##(log(1.0 - self.csi) - prop_ratio)
+		accept_ratio += (1 if split else -1) * prop_ratio ## (log(1.0 - self.csi) - prop_ratio)
 		## Accept or reject the proposal
 		accept = (-np.random.exponential(1) < accept_ratio)
 		if accept:
