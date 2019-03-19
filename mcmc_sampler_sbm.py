@@ -2325,12 +2325,6 @@ class mcmc_sbm:
 					self.lambdank[vnew] += self.nk[j]
 					self.sigmank[vnew] += np.sum(positions ** 2, axis=0)
 				self.vk[vnew] += 1.0
-		#if (self.sigmank < 0).any() or (self.lambdank < 0).any():
-		#	raise ValueError('Error with sigma and/or lambda')
-		#vv = Counter(self.v)
-		#vvv = np.array([vv[key] for key in range(self.H)])
-		#if (vvv != self.vk).any():
-		#	raise ValueError('Error with vs')
 		return None ## the global variables are updated within the function, no need to return anything
 
 	###############################################################
@@ -2581,12 +2575,6 @@ class mcmc_sbm:
 				self.H = H_prop
 		if verbose:
 			print 'Proposal: ' + ['MERGE 2nd order','SPLIT 2nd order'][split] + '\t' + 'Accepted: ' + str(accept)
-		#if (self.sigmank < 0).any() or (self.lambdank < 0).any():
-		#	raise ValueError('Error with sigma and/or lambda')
-		#vv = Counter(self.v)
-		#vvv = np.array([vv[key] for key in range(self.H)])
-		#if (vvv != self.vk).any():
-		#	raise ValueError('Error with vs')
 		return None
 
 	######################################################################
@@ -2682,10 +2670,5 @@ class mcmc_sbm:
 				self.H = H_prop
 		if verbose:
 			print 'Proposal: ' + ['ADD 2nd order','REMOVE 2nd order'][remove] + '\t' + 'Accepted: ' + str(accept)
-		#if (self.sigmank < 0).any() or (self.lambdank < 0).any():
-		#	raise ValueError('Error with sigma and/or lambda')
-		#vv = Counter(self.v)
-		#vvv = np.array([vv[key] for key in range(self.H)])
-		#if (vvv != self.vk).any():
-		#	raise ValueError('Error with vs')
 		return None
+		
