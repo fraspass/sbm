@@ -62,3 +62,4 @@ def dmvt_efficient(x,mu,Sigma_inv,Sigma_logdet,nu):
 		main_exp = -.5 * (nu + d) * log(1 + (x_center.dot(Sigma_inv)).dot(x_center))
 		# Return the result
 		return gamma_ratio + logdet + main_exp ## log-density of the Student's t
+
