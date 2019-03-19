@@ -6,6 +6,8 @@ from scipy.special import gammaln
 import numpy as np
 from numpy import pi,log,exp,sqrt
 from numpy.linalg import svd,eigh,slogdet,inv
+from scipy.sparse.linalg import svds,eigs
+from scipy.sparse import coo_matrix
 import mvt
 import warnings
 from collections import Counter
@@ -18,40 +20,61 @@ from sklearn.cluster import KMeans
 class mcmc_sbm:
 	
 	## Initialise the class from the adjacency matrix A (or biadjacency matrix)
-	def __init__(self,A,m=100,grdpg=True):
-		## Rectangular or square adjacency matrix
-		if A.shape[0] != A.shape[1]:
-			self.bipartite = True
-			self.n = {}
-			self.n['s'] = A.shape[0]
-			self.n['r'] = A.shape[1]
-		else:
-			self.bipartite = False
-			self.directed = True
-			self.n = A.shape[0]
-		## Directed or undirected graph
-		if not self.bipartite and (A == A.T).all():
+	def __init__(self,A,m=100,grdpg=True,initial_embedding=False):
+		self.grdpg = grdpg
+		if initial_embedding:
 			self.directed = False
-		else:
-			self.directed = True
-		## Intialise m (note that cannot have different values of m, otherwise meaning of low rank approximation of A is lost)
-		if self.bipartite:
-			self.m = int(m) if int(m) < np.min(self.n.values()) else np.min([self.n.values()])
-		else:
-			self.m = int(m) if int(m) < self.n else self.n
-		## Calculate the embedding
-		if self.directed:
-			## SVD decomposition of A
-			u,s,v = svd(A)
-			self.X = {}
-			self.X['s'] = np.dot(u[:,:self.m],np.diag(np.sqrt(s[:self.m])))
-			self.X['r'] = np.dot(v.T[:,:self.m],np.diag(np.sqrt(s[:self.m])))
-		else:
-			## Spectral decomposition of A
-			w,v = eigh(A)
-			## If GRDPG, use the top m eigenvalues in magnitude, otherwise use the standard RDPG embedding (top m eigenvalues)
-			w_mag = (-np.abs(w)).argsort() if grdpg else (-w).argsort()
-			self.X = np.dot(v[:,w_mag[:m]],np.diag(np.sqrt(abs(w[w_mag[:m]]))))
+			self.bipartite = False
+			self.n = A.shape[0]
+			self.m = A.shape[1]
+			self.sparse = True
+			self.X = A
+		else:	
+			## Rectangular or square adjacency matrix
+			if A.shape[0] != A.shape[1]:
+				self.bipartite = True
+				self.n = {}
+				self.n['s'] = A.shape[0]
+				self.n['r'] = A.shape[1]
+				if self.n['s'] > 1500 or self.n['r'] > 1500:
+					self.sparse = True
+				else:
+					self.sparse = False
+			else:
+				self.bipartite = False
+				self.directed = True
+				self.n = A.shape[0]
+				if self.n > 1500:
+					self.sparse = True
+				else:
+					self.sparse = False
+			## Directed or undirected graph
+			if not self.bipartite and (A == A.T).all():
+				self.directed = False
+			else:
+				self.directed = True
+			## Intialise m (note that cannot have different values of m, otherwise meaning of low rank approximation of A is lost)
+			if self.bipartite:
+				self.m = int(m) if int(m) < np.min(self.n.values()) else np.min([self.n.values()])
+			else:
+				self.m = int(m) if int(m) < self.n else self.n
+			## Calculate the embedding
+			if self.directed:
+				## SVD decomposition of A
+				u,s,v = svds(coo_matrix(A),k=self.m) if self.sparse else svd(A)
+				self.X = {}
+				self.X['s'] = u[:,::-1] * (s[::-1] ** .5) if self.sparse else np.dot(u[:,:self.m],np.diag(np.sqrt(s[:self.m]))) 
+				self.X['r'] = v.T[:,::-1] * (s[::-1] ** .5) if self.sparse else np.dot(v.T[:,:self.m],np.diag(np.sqrt(s[:self.m])))
+			else:
+				## Spectral decomposition of A
+				w,v = eigs(coo_matrix(A),k=self.m,which='LM' if self.grdpg else 'LR') if self.sparse else eigh(A)
+				## If self.sparse, fix the eigenvalues
+				if self.sparse:
+					w = w.real
+					v = v.real
+				## If GRDPG, use the top m eigenvalues in magnitude, otherwise use the standard RDPG embedding (top m eigenvalues)
+				w_mag = (-np.abs(w)).argsort() if grdpg else (-w).argsort()
+				self.X = np.dot(v[:,w_mag[:m]],np.diag(np.sqrt(abs(w[w_mag[:m]]))))
 		## Calculate an array of outer products for the entire node set
 		if self.directed:
 			self.full_outer_x = {}
@@ -63,11 +86,6 @@ class mcmc_sbm:
 			self.full_outer_x = np.zeros((self.n,self.m,self.m))
 			for x in range(self.n):
 				self.full_outer_x[x] = np.outer(self.X[x],self.X[x])
-
-	## Initialise the optimal dimension d
-	def init_dim(self,d,delta=0.1):
-		self.d = d 
-		self.delta = delta
 	
 	## Initialise the cluster structure (assuming that allocations in z range from 0 to K-1)
 	def init_cluster(self,z,K=0,alpha=1.0,omega=0.1):
@@ -84,6 +102,7 @@ class mcmc_sbm:
 			self.K = (np.max(z)+1) ##len(np.unique(z))
 		## Initialise cluster counts and parameters of the prior distributions
 		self.nk = np.array([np.sum(self.z == k) for k in range(self.K)])
+		self.Ko = np.sum(self.nk > 0)
 		self.alpha = alpha
 		self.omega = omega
 
@@ -107,6 +126,7 @@ class mcmc_sbm:
 		self.z['r'] = np.copy(zr)
 		## Initialise Ks and Kr
 		self.K = {}
+		self.Ko = {}
 		if Ks != 0 and Ks >= (np.max(zs)+1): ## len(np.unique(zs)):
 			self.K['s'] = Ks
 		else:
@@ -119,11 +139,33 @@ class mcmc_sbm:
 		self.nk = {}
 		for key in ['s','r']: 
 			self.nk[key] = np.array([np.sum(self.z[key] == k) for k in range(self.K[key])])
+			self.Ko[key] = np.sum(self.nk[key] > 0)
 		## Initalise the remaining parameters
 		self.alpha = {}
 		self.alpha['s'] = alphas
 		self.alpha['r'] = alphar
 		self.omega = omega
+
+	## Initialise the optimal dimension d
+	def init_dim(self,d,delta=0.1,d_constrained=True):
+		if d_constrained:
+			if self.coclust:
+				if d > np.min(self.Ko.values()):
+					self.d = np.min(self.Ko.values())
+				else:
+					self.d = d 
+			else:
+				if d > self.Ko:
+					self.d = self.Ko
+				else:
+					self.d = d
+		else:
+			self.d = d
+		self.delta = delta
+		if d_constrained:
+			self.d_constrained = True
+		else:
+			self.d_constrained = False
 	
 	## Add the prior parameters for the Gaussian components of the matrix
 	def prior_gauss_left_undirected(self,mean0,Delta0,kappa0=1.0,nu0=1.0):
@@ -371,6 +413,8 @@ class mcmc_sbm:
 				self.sum_x[sr][zold] -= position
 				self.squared_sum_x[sr][zold] -= out_position
 				self.nk[sr][zold] -= 1.0
+				if self.d_constrained:
+					Ko_list = np.array([np.sum(self.nk[sr] + row > 0) for row in np.diag(np.ones(self.K[sr]))])
 				self.nunk[sr][zold] -= 1.0
 				self.kappank[sr][zold] -= 1.0
 				self.lambdank[sr][self.v[sr][zold] if self.equal_var else zold] -= 1.0		
@@ -403,6 +447,8 @@ class mcmc_sbm:
 					self.sum_x[zold] -= position
 					self.squared_sum_x[zold] -= out_position
 				self.nk[zold] -= 1.0
+				if self.d_constrained:
+					Ko_list = np.array([np.sum(self.nk + row > 0) for row in np.diag(np.ones(self.K))])
 				if self.directed:
 					for key in ['s','r']:	
 						self.nunk[key][zold] -= 1.0
@@ -514,10 +560,6 @@ class mcmc_sbm:
 							community_probs_right[key] = np.zeros(self.K) 
 					else:
 						community_probs_right = np.zeros(self.K) 
-			#if (self.lambdank <= 0.0).any():
-			#	raise ValueError('Problem with lambda')
-			#if not self.directed and (self.sigmank <= 0.0).any():
-			#	raise ValueError('Problem with sigma')
 			## Calculate last component of the probability of allocation
 			if self.coclust:
 				community_probs_allo = log(self.nk[sr] + float(self.alpha[sr])/ self.K[sr])
@@ -527,9 +569,13 @@ class mcmc_sbm:
 			if self.directed and not self.coclust:
 				community_probs = exp(community_probs_left['s'] + community_probs_right['s'] + \
 					community_probs_left['r'] + community_probs_right['r'] + community_probs_allo)
+				if self.d_constrained:
+					community_probs *= (self.d <= Ko_list) / Ko_list.astype(float)
 				community_probs /= sum(community_probs)
 			else:
 				community_probs = exp(community_probs_left + community_probs_right + community_probs_allo)
+				if self.d_constrained:
+					community_probs *= (self.d <= Ko_list) / Ko_list.astype(float)
 				community_probs /= sum(community_probs)
 			## Sample the new community allocation
 			znew = int(np.random.choice(self.K[sr] if self.coclust else self.K,p=community_probs))
@@ -537,6 +583,7 @@ class mcmc_sbm:
 				self.z[sr][j] = znew
 				## Update the Student's t parameters accordingly
 				self.nk[sr][znew] += 1.0
+				self.Ko[sr] = np.sum(self.nk[sr] > 0)
 				self.nunk[sr][znew] += 1.0
 				self.kappank[sr][znew] += 1.0
 				self.lambdank[sr][self.v[sr][znew] if self.equal_var else znew] += 1.0
@@ -561,6 +608,7 @@ class mcmc_sbm:
 				self.z[j] = znew
 				## Update the Student's t parameters accordingly
 				self.nk[znew] += 1.0
+				self.Ko = np.sum(self.nk > 0)
 				if self.directed:
 					for key in ['s','r']:
 						self.nunk[key][znew] += 1.0
@@ -607,12 +655,6 @@ class mcmc_sbm:
 						self.Delta_k[znew] = Delta_old
 						self.Delta_k_inv[znew] = Delta_inv_old
 						self.Delta_k_det[znew] = Delta_det_old
-		#if (self.sigmank < 0).any() or (self.lambdank < 0).any():
-		#	raise ValueError('Error with sigma and/or lambda')
-		#vv = Counter(self.v)
-		#vvv = np.array([vv[key] for key in range(self.H)])
-		#if (vvv != self.vk).any():
-		#	raise ValueError('Error with vs')
 		return None ## the global variables are updated within the function, no need to return anything
 
 	###################################################
@@ -622,25 +664,47 @@ class mcmc_sbm:
 		## Propose a new value of d
 		if prop_step == 1:
 			if self.d == 1:
-				d_prop = 2
+				if (np.min(self.Ko.values()) if self.coclust else self.Ko) > 1:
+					d_prop = 2
+				else:
+					if verbose:
+						print 'Proposal: ' + '2' + '\t' + 'Accepted: ' + 'False'
+					return None
 			elif self.d == self.m:
 				d_prop = self.m-1
 			else:
 				d_prop = np.random.choice([self.d-1, self.d+1])
+				if d_prop > (np.min(self.Ko.values()) if self.coclust else self.Ko):
+					if verbose:
+						print 'Proposal: ' + str(d_prop) + '\t' + 'Accepted: ' + 'False'
+					return None
 		else:
 			## Calculate the proposal 
 			if delta_prop != 0.0:
-				prop_probs_left = (1-delta_prop) ** (np.arange(len(range(np.max([1,self.d-prop_step]),self.d))))[::-1] * delta_prop
-				prop_probs_right = (1-delta_prop) ** (np.arange(len(range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1])))))) * delta_prop
+				if self.d_constrained:
+					prop_probs_left = (1-delta_prop) ** (np.arange(len(range(np.max([1,self.d-prop_step]),self.d))))[::-1] * delta_prop
+					prop_probs_right = (1-delta_prop) ** (np.arange(len(range(np.min([self.d+1]+(self.Ko.values() if self.coclust else [self.Ko])),
+						int(np.min((self.Ko.values() if self.coclust else [self.Ko])+[self.m+1,self.d+prop_step+1])))))) * delta_prop
+				else:
+					prop_probs_left = (1-delta_prop) ** (np.arange(len(range(np.max([1,self.d-prop_step]),self.d))))[::-1] * delta_prop
+					prop_probs_right = (1-delta_prop) ** (np.arange(len(range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1])))))) * delta_prop
 				if len(prop_probs_right) == 0:
 					probs = prop_probs_left / np.sum(prop_probs_left)
 				elif len(prop_probs_left) == 0:
 					probs = .5 * prop_probs_right / np.sum(prop_probs_right)
 				else:
 					probs = np.append(.5 * prop_probs_left / np.sum(prop_probs_left), .5 * prop_probs_right / np.sum(prop_probs_right))
-				props = np.append(range(np.max([1,self.d-prop_step]),self.d),range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1]))))
+				if self.d_constrained:
+					props = np.append(range(np.max([1,self.d-prop_step]),self.d),range(np.min([self.d+1]+(self.Ko.values() if self.coclust else [self.Ko])),
+						int(np.min((self.Ko.values() if self.coclust else [self.Ko])+[self.m+1,self.d+prop_step+1]))))
+				else:
+					props = np.append(range(np.max([1,self.d-prop_step]),self.d),range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1]))))
 			else:
-				props = np.append(range(np.max([1,self.d-prop_step]),self.d),range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1]))))
+				if self.d_constrained:
+					props = np.append(range(np.max([1,self.d-prop_step]),self.d),range(np.min([self.d+1]+(self.Ko.values() if self.coclust else [self.Ko])),
+						int(np.min((self.Ko.values() if self.coclust else [self.Ko])+[self.m+1,self.d+prop_step+1]))))
+				else:
+					props = np.append(range(np.max([1,self.d-prop_step]),self.d),range(self.d+1,int(np.min([self.m+1,self.d+prop_step+1]))))
 				probs = 1.0/len(props) * np.ones(len(props))
 			d_prop = int(np.random.choice(props,p=probs))
 			q_prop_old = probs[np.where(props == d_prop)[0]][0]
@@ -859,10 +923,11 @@ class mcmc_sbm:
 		## Acceptance ratio
 		accept_ratio = new_lik - old_lik + (d_prop - self.d) * log(1 - self.delta)
 		if prop_step == 1:
-			if self.d == 1 or d_prop == 1:
-				accept_ratio += (self.d - d_prop) * log(2)
-			if self.d == self.m or d_prop == self.m:
-				accept_ratio -= (self.d - d_prop) * log(2)
+			if not self.d_constrained:
+				if self.d == 1 or d_prop == 1:
+					accept_ratio += (self.d - d_prop) * log(2)
+				if self.d == self.m or d_prop == self.m:
+					accept_ratio -= (self.d - d_prop) * log(2)
 		else:
 			accept_ratio += log(q_prop_new) - log(q_prop_old)
 		accept = ( -np.random.exponential(1) < accept_ratio )
@@ -884,12 +949,6 @@ class mcmc_sbm:
 			self.Delta_k_det = Delta_k_det_prop
 		if verbose:
 			print 'Proposal: ' + str(d_prop) + '\t' + 'Accepted: ' + str(accept)
-		#if (self.sigmank < 0).any() or (self.lambdank < 0).any():
-		#	raise ValueError('Error with sigma and/or lambda')
-		#vv = Counter(self.v)
-		#vvv = np.array([vv[key] for key in range(self.H)])
-		#if (vvv != self.vk).any():
-		#	raise ValueError('Error with vs')
 		return None
 
 	#################################################
@@ -921,6 +980,10 @@ class mcmc_sbm:
 				z_prop[j] = self.K
 		else:
 			split = False
+			if self.d == (self.Ko[sr] if self.coclust else self.Ko):
+				if verbose:
+					print 'Proposal: ' + 'MERGE' + '\t' + 'Accepted: ' + 'False'
+				return None
 			## Choose to merge to the cluster with minimum index (zmerge) and remove the cluster with maximum index (zlost)
 			if self.coclust:
 				zmerge = min([self.z[sr][i],self.z[sr][j]])
@@ -1597,10 +1660,14 @@ class mcmc_sbm:
 					gammaln(np.sum(nk_rest) + float(self.alpha)/(self.K-1.0))
 			## Prior on K and q function
 			accept_ratio -= log(1.0 - self.omega) - prop_ratio
-			#if ((np.sum(self.sigmank[[zmerge,zlost]],axis=0) - self.prior_sigma[self.d:]) <= 0.0).any():
-			#	raise ValueError('ERROR')
+		## Add d
+		if self.d_constrained:
+			if self.coclust:
+				accept_ratio += log((self.Ko[sr] + (1.0 if split else -1.0)) / self.Ko[sr])
+			else:
+				accept_ratio += log((self.Ko + (1.0 if split else -1.0)) / self.Ko)
 		## Accept or reject the proposal
-		accept = (-np.random.exponential(1) < accept_ratio)
+		accept = (-np.random.exponential(1) < accept_ratio) 
 		if accept:
 			## Update the stored values
 			if split:
@@ -1609,6 +1676,7 @@ class mcmc_sbm:
 						self.z[sr] = np.copy(z_prop)
 						self.nk[sr][zsplit] = nk_rest[0]
 						self.nk[sr] = np.append(self.nk[sr],nk_rest[1])
+						self.Ko[sr] = np.sum(self.nk[sr] > 0)
 						self.nunk[sr] = self.nu0[sr] + self.nk[sr]
 						self.kappank[sr] = self.kappa0[sr] + self.nk[sr]
 						self.sum_x[sr][zsplit] = sum_rest[0]
@@ -1638,6 +1706,7 @@ class mcmc_sbm:
 						self.z = np.copy(z_prop)
 						self.nk[zsplit] = nk_rest[0]
 						self.nk = np.append(self.nk,nk_rest[1])
+						self.Ko = np.sum(self.nk > 0)
 						self.nunk = self.nu0 + self.nk 
 						self.kappank = self.kappa0 + self.nk
 						self.sum_x[zsplit] = sum_rest[0]
@@ -1667,6 +1736,7 @@ class mcmc_sbm:
 					self.z = np.copy(z_prop)
 					self.nk[zsplit] = nk_rest[0]
 					self.nk = np.append(self.nk,nk_rest[1])
+					self.Ko = np.sum(self.nk > 0)
 					for key in ['s','r']:
 						self.nunk[key] = self.nu0[key] + self.nk 
 						self.kappank[key] = self.kappa0[key] + self.nk
@@ -1721,6 +1791,7 @@ class mcmc_sbm:
 						self.Delta_k_det[sr][zmerge] = slogdet(self.Delta_k[sr][zmerge])[1]
 						## Delete components from vectors and dictionaries
 						self.nk[sr] = np.delete(self.nk[sr],zlost)
+						self.Ko[sr] = np.sum(self.nk[sr] > 0)
 						self.nunk[sr] = np.delete(self.nunk[sr],zlost)
 						self.kappank[sr] = np.delete(self.kappank[sr],zlost)
 						self.sum_x[sr] = np.delete(self.sum_x[sr],zlost,axis=0)
@@ -1768,6 +1839,7 @@ class mcmc_sbm:
 						self.Delta_k_det[zmerge] = slogdet(self.Delta_k[zmerge])[1]
 						## Delete components from vectors and dictionaries
 						self.nk = np.delete(self.nk,zlost)
+						self.Ko = np.sum(self.nk > 0)
 						self.nunk = np.delete(self.nunk,zlost)
 						self.kappank = np.delete(self.kappank,zlost)
 						self.sum_x = np.delete(self.sum_x,zlost,axis=0)
@@ -1846,12 +1918,6 @@ class mcmc_sbm:
 					self.K -= 1
 		if verbose:
 			print 'Proposal: ' + ['MERGE','SPLIT'][split] + '\t' + 'Accepted: ' + str(accept)
-		#if (self.sigmank < 0).any() or (self.lambdank < 0).any():
-		#	raise ValueError('Error with sigma and/or lambda')
-		#vv = Counter(self.v)
-		#vvv = np.array([vv[key] for key in range(self.H)])
-		#if (vvv != self.vk).any():
-		#	raise ValueError('Error with vs')
 		return None
 
 	########################################################
@@ -2072,12 +2138,6 @@ class mcmc_sbm:
 				self.K = K_prop
 		if verbose:
 			print 'Proposal: ' + ['ADD','REMOVE'][remove] + '\t' + 'Accepted: ' + str(accept)
-		#if (self.sigmank < 0).any() or (self.lambdank < 0).any():
-		#	raise ValueError('Error with sigma and/or lambda')
-		#vv = Counter(self.v)
-		#vvv = np.array([vv[key] for key in range(self.H)])
-		#if (vvv != self.vk).any():
-		#	raise ValueError('Error with vs')
 		return None
 
 	#####################################################################
