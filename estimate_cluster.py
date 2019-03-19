@@ -30,4 +30,3 @@ def estimate_clustering(psm,k=None,min_clust=0):
 		clust = cluster_model.fit_predict(1-psm) + 1
 	return clust if min_clust!=0 else clust-1  
 
-
