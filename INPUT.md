@@ -6,7 +6,7 @@ The model is described in *Sanna Passino, F. and Heard, N. A., "Bayesian estimat
 
 ## Understanding the code
 
-The main part of the code is contained in the file `mcmc_sampler_sbm.py`, which contains a *python* class for the main proposals used in the MCMC sampler. The class uses some functions contained in `mvt.py`. The estimated clusters can be obtained from the estimated posterior similarity matrix (called `psm` in the code) using the function in `estimate_cluster.py`, which uses *rpy2*. The files `synthetic_sbm.py` contain code to simulate a stochastic blockmodel using the RDPG construction, and gives an example on how to run the MCMC sampler. The files `santander.py` and `enron.py` give examples on real world networks. 
+The main part of the code is contained in the file `mcmc_sampler_sbm.py`, which contains a *python* class for the main proposals used in the MCMC sampler. The class uses some functions contained in `mvt.py`. The estimated clusters can be obtained from the estimated posterior similarity matrix (called `psm` in the code) using the function `estimate_clustering` in `estimate_cluster.py`, which uses *rpy2*. The file `synthetic_sbm.py` contains code to simulate a stochastic blockmodel using the RDPG construction, and gives an example on how to run the MCMC sampler. The files `santander.py` and `enron.py` give examples on real world networks. 
 
 <!--
 ## References
