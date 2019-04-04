@@ -119,12 +119,20 @@ for s in range(nburn+nsamp):
             Ho += [np.sum(g.vk > 0)]
             psm += np.equal.outer(g.z,g.z)
 
-
+## Convert to arrays
 d = np.array(d)
 K = np.array(K)
 Ko = np.array(Ko)
 H = np.array(H)
 Ho = np.array(Ho)
+
+## Save files
+np.savetxt('d.txt',d)
+np.savetxt('K.txt',K)
+np.savetxt('Ko.txt',Ko)
+np.savetxt('H.txt',H)
+np.savetxt('Ho.txt',Ho)
+np.savetxt('psm.txt',psm)
 
 ### Plots
 from scipy.stats import mode
@@ -134,29 +142,22 @@ ax.bar(np.array(Counter(Ko).keys())-.35,Counter(Ko).values(),width=0.35,color='b
 ax.bar(np.array(Counter(Ho).keys()),Counter(Ho).values(),width=0.35,color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
 leg = ax.legend()
 plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
-plt.show()
+plt.savefig('posterior_barplot_unrestricted.pdf')
 
 fig, ax = plt.subplots()
 ax.bar(np.array(Counter(Ko[Ko >= d]).keys())-.35,Counter(Ko[Ko >= d]).values(),width=0.35,color='black',align='edge',alpha=.8,label='$K_\\varnothing$')
 ax.bar(np.array(Counter(Ho[Ko >= d]).keys()),Counter(Ho[Ko >= d]).values(),width=0.35,color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
 leg = ax.legend()
 plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
-plt.show()
-
-fig, ax = plt.subplots()
-ax.bar(np.array(Counter(Ko).keys())-.175,Counter(Ko).values(),width=0.35,color='black',align='edge',alpha=.8,label='$K_\\varnothing$')
-leg = ax.legend()
-plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
-plt.show()
-
-fig, ax = plt.subplots()
-ax.bar(np.array(Counter(Ko[Ko >= d]).keys())-.175,Counter(Ko[Ko >= d]).values(),width=0.35,color='black',align='edge',alpha=.8,label='$K_\\varnothing$')
-leg = ax.legend()
-plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
-plt.show()
+plt.savefig('posterior_barplot_restricted.pdf')
 
 U,S,V = np.linalg.svd(A)
 plt.plot(np.arange(len(S))+1,S,c='black')
 plt.plot(np.arange(len(S))+1,S,'.',markersize=.3,c='black')
 plt.plot(mode(d)[0][0]+1,S[mode(d)[0][0]],"o",c='red')
-plt.show()
+plt.savefig('scree_plot.pdf')
+
+## MAP for clustering
+cc_pear = estimate_clustering(psm)
+cc_map = estimate_clustering(psm,k=mode(Ko)[0][0])
+
