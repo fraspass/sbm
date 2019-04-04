@@ -73,10 +73,10 @@ g.init_dim(d=10,delta=0.1)
 
 ## Initialise parameters
 if sym:
-    g.prior_gauss_left_undirected(mean0=np.mean(g.X,axis=0),Delta0=0.1*np.diag(np.var(g.X,axis=0)),kappa0=1.0,nu0=1.0)
+    g.prior_gauss_left_undirected(mean0=np.zeros(m),Delta0=0.1*np.diag(np.var(g.X,axis=0)),kappa0=1.0,nu0=1.0)
     g.prior_gauss_right_undirected(sigma0=np.var(g.X,axis=0),lambda0=1.0)
 else:
-    g.prior_gauss_left_directed(mean0s=np.mean(g.X['s'],axis=0),mean0r=np.mean(g.X['r'],axis=0),
+    g.prior_gauss_left_directed(mean0s=np.zeros(m),mean0r=np.zeros(m),
         Delta0s=0.1*np.diag(np.var(g.X['s'],axis=0)),Delta0r=0.1*np.diag(np.var(g.X['r'],axis=0)))
     g.prior_gauss_right_directed(sigma0s=np.var(g.X['s'],axis=0),sigma0r=np.var(g.X['r'],axis=0))
 
