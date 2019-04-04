@@ -2,7 +2,7 @@
 
 ## Methodology
 
-The model is described in *Sanna Passino, F. and Heard, N. A., "Bayesian estimation of the latent dimension and communities in stochastic blockmodel"* ([link to arXiv](https://arxiv.org/abs/0000.00000)). 
+The model is described in *Sanna Passino, F. and Heard, N. A., "Bayesian estimation of the latent dimension and communities in stochastic blockmodel"* ([link to arXiv --- CURRENTLY NOT AVAILABLE](https://arxiv.org/abs/0000.00000)). 
 
 ## Understanding the code
 
