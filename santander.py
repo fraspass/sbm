@@ -33,10 +33,10 @@ cycle_edges = cycle[['StartStation Id','EndStation Id']]
 parser = argparse.ArgumentParser()
 # Boolean variable to use LSE (default ASE)
 parser.add_argument("-l","--lap", type=str2bool, dest="use_laplacian", default=False, const=False, nargs="?",\
-	help="Boolean variable to use LSE, default FALSE (i.e. use ASE)")
+	help="Boolean variable for LSE, default FALSE (i.e. use ASE)")
 # Boolean variable to use second level clustering (default True)
 parser.add_argument("-s","--sord", type=str2bool, dest="second_order_clustering", default=True, const=False, nargs="?",\
-	help="Boolean variable to use second level clustering, default TRUE")
+	help="Boolean variable for second level clustering, default TRUE")
 # Burnin
 parser.add_argument("-B","--nburn", type=int, dest="nburn", default=25000, const=True, nargs="?",\
 	help="Integer: length of burnin, default 25000")
@@ -45,7 +45,7 @@ parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=500000, cons
 	help="Integer: length of MCMC chain after burnin, default 500000")
 ## Set destination folder for output
 parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="", const=True, nargs="?",\
-	help="String: name of the destination folder for the output files")
+	help="String: name of the destination folder for the output files (*** the folder must exist ***)")
 ## Parse arguments
 args = parser.parse_args()
 use_laplacian = args.use_laplacian
