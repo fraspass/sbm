@@ -13,9 +13,9 @@ import warnings
 from collections import Counter
 from sklearn.cluster import KMeans
 
-#######################################################################################################################
-### A Bayesian model for estimation of the optimal latent dimension of network embeddings of stochastic blockmodels ###
-#######################################################################################################################
+#############################################################################################
+### Bayesian estimation of the latent dimension and communities in stochastic blockmodels ###
+#############################################################################################
 
 class mcmc_sbm:
 	
