@@ -41,7 +41,7 @@ Reproducing the figures in the paper is also easy. For example, for Figure 5:
 ```
 ./synthetic_sbm.py -n 250 -n2 300 -g 1 -b 1
 ```
-Note that the above code produces plot in `matplotlib`. The figures in the paper are postprocessed using `matplotlib2tikz`. 
+The resulting plots are in the repository in the directory `Results` (default for `-f`). Note that the above code produces plot in `matplotlib`. The figures in the paper are postprocessed using `matplotlib2tikz`. 
 ```
 from matplotlib2tikz import save as tikz_save
 tikz_save('foo.tex')
