@@ -224,17 +224,17 @@ if not run_mcmc:
     if gen_directed:
         sa = {}
         for key in ['s','r']:
-            sa = np.zeros((g.K[key],15))
-            for k in range(g.K[key]):
-                sa[k] = g.X[key][cc[key] == k].mean(axis=0)[:15]
+            sa = np.zeros((g.K[key] if coclust else g.K,15))
+            for k in range(g.K[key] if coclust else g.K):
+                sa[k] = g.X[key][(cc[key] if coclust else c) == k].mean(axis=0)[:15]
             sm = np.append(np.append(np.max(sa,axis=0),np.flip(np.min(sa,axis=0))),np.max(sa[:,0]))
             vv = np.append(np.append(np.arange(1,16),np.flip(np.arange(1,16))),1)
             plt.figure()
             plt.plot(range(1,16),g.X[key].mean(axis=0)[:15],c='black')
             plt.xlabel('$d$')
             plt.plot(vv,sm,'--',c='red')
-            for k in range(g.K[key]):
-                plt.plot(range(1,16),g.X[key][cc[key] == k].mean(axis=0)[:15],'x',c='gray')
+            for k in range(g.K[key] if coclust else g.K):
+                plt.plot(range(1,16),g.X[key][(cc[key] if coclust else c) == k].mean(axis=0)[:15],'x',c='gray')
             plt.legend(['Overall mean','Max./min. within-cluster mean','Within-cluster mean'])
             if dest_folder != '':
                 plt.savefig(dest_folder+'/mean_sim_'+key+'.pdf')
@@ -264,8 +264,8 @@ if not run_mcmc:
             plt.figure()
             plt.plot(range(1,26),np.var(g.X[key],axis=0)[:25],'--',c='black')
             plt.xlabel('$d$')
-            for k in range(g.K[key]):
-                plt.plot(range(1,26),np.var(g.X[key][cc[key] == k],axis=0)[:25],c='gray')
+            for k in range(g.K[key] if coclust else g.K):
+                plt.plot(range(1,26),np.var(g.X[key][(cc[key] if coclust else c) == k],axis=0)[:25],c='gray')
             plt.legend(['Overall variance','Within-cluster variance'])
             if dest_folder != '':
                 plt.savefig(dest_folder+'/var_sim_'+key+'.pdf')
@@ -289,14 +289,14 @@ if not run_mcmc:
     if gen_directed:
         for key in ['s','r']:
             plt.figure()
-            wc_corcoefs = np.zeros((g.K[key],g.m,30))
+            wc_corcoefs = np.zeros((g.K[key] if coclust else g.K,g.m,30))
             corcoefs = (np.corrcoef(g.X[key].T)-np.diag(np.ones(g.m)))[:,:30]
-            for k in range(g.K[key]):
-                wc_corcoefs[k] = (np.corrcoef(g.X[key][cc[key] == k].T)-np.diag(np.ones(g.m)))[:,:30]
+            for k in range(g.K[key] if coclust else g.K):
+                wc_corcoefs[k] = (np.corrcoef(g.X[key][(cc[key] if coclust else c) == k].T)-np.diag(np.ones(g.m)))[:,:30]
             f, ax = plt.subplots(1,1)
             ax.set(xlabel='Correlation coefficient $\\rho_{ij}^{(k)}$')
             ax.hist(wc_corcoefs[:,2:,2:].flatten(),color='gray',bins=30,label='Histogram of $\\rho_{ij}^{(k)}$ for $X_{d:}^'+key+'$',density=True)
-            ax.scatter(wc_corcoefs[:,0,1].flatten(),np.zeros(g.K[key]),color='red',label='$\\rho_{ij}^{(k)}$ for $X_{:d}^'+key+'$')
+            ax.scatter(wc_corcoefs[:,0,1].flatten(),np.zeros(g.K[key] if coclust else g.K),color='red',label='$\\rho_{ij}^{(k)}$ for $X_{:d}^'+key+'$')
             xx = np.linspace(-.2,.2,500)
             kde = gkde(wc_corcoefs[:,2:,2:].flatten())
             ax.plot(xx, kde(xx),color='black')
@@ -406,3 +406,79 @@ if run_mcmc:
                     H += [g.H]
                     Ho += [np.sum(g.vk > 0)]
                 psm += np.equal.outer(g.z,g.z)
+
+    ## Convert to arrays
+    d = np.array(d)
+    if coclust:
+        for key in ['s','r']:
+            K[key] = np.array(K[key])
+            Ko[key] = np.array(Ko[key])
+            if second_order_clustering:
+                H[key] = np.array(H[key])
+                Ho[key] = np.array(Ho[key])
+    else:
+        K = np.array(K)
+        Ko = np.array(Ko)
+        if second_order_clustering:
+            H = np.array(H)
+            Ho = np.array(Ho)
+
+    ## Save files
+    if dest_folder == '':
+        np.savetxt('d.txt',d,fmt='%d')
+        if coclust:
+            for key in ['s','r']:
+                np.savetxt('K_'+key+'.txt',K[key],fmt='%d')
+                np.savetxt('Ko_'+key+'.txt',Ko[key],fmt='%d')
+                if second_order_clustering:
+                    np.savetxt('H_'+key+'.txt',H[key],fmt='%d')
+                    np.savetxt('Ho_'+key+'.txt',Ho[key],fmt='%d')
+                np.savetxt('psm_'+key+'.txt',psm[key]/float(np.max(psm[key])),fmt='%f')
+        else:
+            np.savetxt('K.txt',K,fmt='%d')
+            np.savetxt('Ko.txt',Ko,fmt='%d')
+            if second_order_clustering:
+                np.savetxt('H.txt',H,fmt='%d')
+                np.savetxt('Ho.txt',Ho,fmt='%d')
+            np.savetxt('psm.txt',psm/float(np.max(psm)),fmt='%f')
+    else:
+        np.savetxt(dest_folder+'/d.txt',d,fmt='%d')
+        if coclust:
+            for key in ['s','r']:
+                np.savetxt(dest_folder+'/K_'+key+'.txt',K[key],fmt='%d')
+                np.savetxt(dest_folder+'/Ko_'+key+'.txt',Ko[key],fmt='%d')
+                if second_order_clustering:
+                    np.savetxt(dest_folder+'/H_'+key+'.txt',H[key],fmt='%d')
+                    np.savetxt(dest_folder+'/Ho_'+key+'.txt',Ho[key],fmt='%d')
+                np.savetxt(dest_folder+'/psm_'+key+'.txt',psm[key]/float(np.max(psm[key])),fmt='%f')  
+        else:     
+            np.savetxt(dest_folder+'/d.txt',d,fmt='%d')
+            np.savetxt(dest_folder+'/K.txt',K,fmt='%d')
+            np.savetxt(dest_folder+'/Ko.txt',Ko,fmt='%d')
+            if second_order_clustering:
+                np.savetxt(dest_folder+'/H.txt',H,fmt='%d')
+                np.savetxt(dest_folder+'/Ho.txt',Ho,fmt='%d')
+            np.savetxt(dest_folder+'/psm.txt',psm/float(np.max(psm)),fmt='%f')
+
+    ## MAP for clustering
+    if coclust:
+        cc_pear = {}
+        cc_map = {}
+        for key in ['s','r']:
+            cc_pear[key] = estimate_clustering(psm[key])
+            cc_map[key] = estimate_clustering(psm[key],k=mode(Ko[key])[0][0])
+            if dest_folder == '':
+                np.savetxt('pear_clusters_'+key+'.txt',cc_pear[key],fmt='%d')
+                np.savetxt('map_clusters_'+key+'.txt',cc_map[key],fmt='%d')
+            else:
+                np.savetxt(dest_folder+'/pear_clusters_'+key+'.txt',cc_pear[key],fmt='%d')
+                np.savetxt(dest_folder+'/map_clusters_'+key+'.txt',cc_map[key],fmt='%d')
+    else:
+        cc_pear = estimate_clustering(psm)
+        cc_map = estimate_clustering(psm,k=mode(Ko)[0][0])
+        if dest_folder == '':
+            np.savetxt('pear_clusters.txt',cc_pear,fmt='%d')
+            np.savetxt('map_clusters.txt',cc_map,fmt='%d')
+        else:
+            np.savetxt(dest_folder+'/pear_clusters.txt',cc_pear,fmt='%d')
+            np.savetxt(dest_folder+'/map_clusters.txt',cc_map,fmt='%d')
