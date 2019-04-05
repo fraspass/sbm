@@ -40,7 +40,7 @@ parser.add_argument("-s","--sord", type=str2bool, dest="second_order_clustering"
 # Burnin
 parser.add_argument("-B","--nburn", type=int, dest="nburn", default=25000, const=True, nargs="?",\
 	help="Integer: length of burnin, default 25000")
-# Consider Aij as a truncated latent Poisson count Nij 
+# Number of samples
 parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=500000, const=True, nargs="?",\
 	help="Integer: length of MCMC chain after burnin, default 500000")
 ## Set destination folder for output
@@ -172,6 +172,7 @@ else:
 ## Scree-plot
 w,v = np.linalg.eigh(A)
 S = w[::-1]
+plt.figure()
 plt.plot(np.arange(len(S))+1,S,c='black')
 plt.plot(np.arange(len(S))+1,S,'.',markersize=.3,c='black')
 plt.plot(mode(d)[0][0]+1,S[mode(d)[0][0]],"o",c='red')
@@ -181,6 +182,7 @@ else:
 	plt.savefig(dest_folder+'/scree_plot.pdf')
 
 ## Posterior barplot of K and H
+plt.figure()
 fig, ax = plt.subplots()
 ax.bar(np.array(Counter(Ko).keys())-.35,Counter(Ko).values(),width=0.35,color='black',align='edge',alpha=.8,label='$K_\\varnothing$')
 if second_order_clustering:
