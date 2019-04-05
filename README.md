@@ -35,18 +35,19 @@ For example, if the user wants to obtain 25000 MCMC samples from the posterior f
 ./enron.py -M 25000 -B 0 -c yes -s yes -f Output
 
 ```
+The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters <img alt="$K_\varnothing$" src="svgs/c09a28e6f1aeb430bd603a5562d11a90.svg" align="middle" width="24.235233pt" height="22.4657235pt"/>, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
 
 Reproducing the figures in the paper is also easy. For example, for Figure 5:
 ```
 ./synthetic_sbm.py -n 250 -n2 300 -g 1 -b 1
 ```
-Note that the above code produces plot in `matplotlib`. The figures in the paper are postprocessed using `matplotlib2tikz`. 
+The resulting plots are in the repository in the directory `Results` (default for `-f`). Note that the above code produces plot in `matplotlib`. The figures in the paper are postprocessed using `matplotlib2tikz`. 
 ```
 from matplotlib2tikz import save as tikz_save
 tikz_save('foo.tex')
 ```
 
-**Note** -- For the Boolean variables, the admissable values are `yes`, `true`, `t`, `y`, `1` (and uppercase counterparts) for the positive class, and `no`, `false`, `f`, `n`, `0` (and uppercase counterparts) for the negative class. 
+**- Note -** For the Boolean variables, the admissable values are `yes`, `true`, `t`, `y`, `1` (and uppercase counterparts) for the positive class, and `no`, `false`, `f`, `n`, `0` (and uppercase counterparts) for the negative class. 
 
 <!--
 ## References
