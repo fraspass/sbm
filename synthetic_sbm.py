@@ -62,7 +62,7 @@ parser.add_argument("-B","--nburn", type=int, dest="nburn", default=25000, const
 parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=500000, const=True, nargs="?",\
     help="Integer: length of MCMC chain after burnin, default 500000")
 ## Set destination folder for output
-parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="", const=True, nargs="?",\
+parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="Results", const=True, nargs="?",\
     help="String: name of the destination folder for the output files (*** the folder must exist ***)")
 
 ## Parse arguments
