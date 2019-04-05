@@ -35,6 +35,7 @@ For example, if the user wants to obtain 25000 MCMC samples from the posterior f
 ./enron.py -M 25000 -B 0 -c yes -s yes -f Output
 
 ```
+The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters $K_\varnothing$, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
 
 Reproducing the figures in the paper is also easy. For example, for Figure 5:
 ```
@@ -46,7 +47,7 @@ from matplotlib2tikz import save as tikz_save
 tikz_save('foo.tex')
 ```
 
-**Note** -- For the Boolean variables, the admissable values are `yes`, `true`, `t`, `y`, `1` (and uppercase counterparts) for the positive class, and `no`, `false`, `f`, `n`, `0` (and uppercase counterparts) for the negative class. 
+**- Note -** For the Boolean variables, the admissable values are `yes`, `true`, `t`, `y`, `1` (and uppercase counterparts) for the positive class, and `no`, `false`, `f`, `n`, `0` (and uppercase counterparts) for the negative class. 
 
 <!--
 ## References
