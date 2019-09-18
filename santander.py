@@ -171,7 +171,7 @@ else:
 
 ## Scree-plot
 w,v = np.linalg.eigh(A)
-S = w[::-1]
+S = np.abs(w)[np.argsort(np.abs(w))][::-1]
 plt.figure()
 plt.plot(np.arange(len(S))+1,S,c='black')
 plt.plot(np.arange(len(S))+1,S,'.',markersize=.3,c='black')
