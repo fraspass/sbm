@@ -37,7 +37,7 @@ For example, if the user wants to obtain 25000 MCMC samples from the posterior f
 ./enron.py -M 25000 -B 0 -c yes -s yes -f Output
 
 ```
-The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters <img src="svgs/c09a28e6f1aeb430bd603a5562d11a90.svg?invert_in_darkmode" align=middle width=24.23523299999999pt height=22.465723500000017pt/>, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
+The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters <img src="svgs/c09a28e6f1aeb430bd603a5562d11a90.svg" align=middle width=24.23523299999999pt height=22.465723500000017pt/>, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
 
 Reproducing the figures in the paper is also easy. For example, for Figure 5:
 ```
