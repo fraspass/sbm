@@ -28,7 +28,7 @@ Running the code is easy: `./synthetic_sbm.py --help`, `./santander.py --help` a
 * `-c` and `-s` are Boolean variables used for co-clustering and second-level clustering respectively,
 * `-q` is Boolean variables used for the unconstrained or constrained model,
 * `-r` is a Boolean variable: if it is set to `1`, then MCMC is run on the simulated graphs, otherwise summary plots are produced, 
-* `-M` and `-B` denote the number of samples in the MCMC chain, and the burnin,
+* `-M` and `-B` denote the number of samples in the MCMC chain, and the burn-in,
 * `-f` is the name of the destination folder for the output files. 
 
 For example, if the user wants to obtain 25000 MCMC samples from the posterior for the Enron Email Dataset, with no burnin, using coclustering and the second-level community allocations, and store the results in a folder `Output`:
@@ -37,7 +37,7 @@ For example, if the user wants to obtain 25000 MCMC samples from the posterior f
 ./enron.py -M 25000 -B 0 -c yes -s yes -f Output
 
 ```
-The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters <img src="svgs/c09a28e6f1aeb430bd603a5562d11a90.svg?invert_in_darkmode" align=middle width=24.235232999999997pt height=22.465723499999996pt/>, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
+The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters <img src="svgs/c09a28e6f1aeb430bd603a5562d11a90.svg?invert_in_darkmode" align=middle width=24.23523299999999pt height=22.465723500000017pt/>, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
 
 Reproducing the figures in the paper is also easy. For example, for Figure 5:
 ```
