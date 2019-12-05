@@ -28,5 +28,5 @@ def estimate_clustering(psm,k=None,min_clust=0):
 		## If k is specified, use agglomerative clustering 
 		cluster_model = AgglomerativeClustering(n_clusters=int(k), affinity='precomputed', linkage='average') 
 		clust = cluster_model.fit_predict(1-psm) + 1
-	return clust if min_clust!=0 else clust-1  
-
+	return clust if min_clust!=0 else clust-1
+	

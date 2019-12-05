@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys
+import sys, os
 import argparse
 import numpy as np
 import pandas as pd
@@ -45,7 +45,8 @@ parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=500000, cons
 	help="Integer: length of MCMC chain after burnin, default 500000")
 ## Set destination folder for output
 parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="Results", const=True, nargs="?",\
-    help="String: name of the destination folder for the output files (*** the folder must exist ***)")
+    help="String: name of the destination folder for the output files")
+
 ## Parse arguments
 args = parser.parse_args()
 use_laplacian = args.use_laplacian
@@ -53,6 +54,10 @@ second_order_clustering = args.second_order_clustering
 nburn = args.nburn
 nsamp = args.nsamp
 dest_folder = args.dest_folder
+
+# Create output directory if doesn't exist
+if dest_folder != '' and not os.path.exists(dest_folder):
+    os.mkdir(dest_folder)
 
 ## Create a dictionary and the adjacency matrix
 cycle_dict = {}

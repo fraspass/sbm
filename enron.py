@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys
+import sys, os
 import argparse
 import numpy as np
 import pandas as pd
@@ -45,6 +45,7 @@ parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=500000, cons
 ## Set destination folder for output
 parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="Results", const=True, nargs="?",\
     help="String: name of the destination folder for the output files (*** the folder must exist ***)")
+
 ## Parse arguments
 args = parser.parse_args()
 coclust = args.coclust
@@ -52,6 +53,10 @@ second_order_clustering = args.second_order_clustering
 nburn = args.nburn
 nsamp = args.nsamp
 dest_folder = args.dest_folder
+
+# Create output directory if doesn't exist
+if dest_folder != '' and not os.path.exists(dest_folder):
+    os.mkdir(dest_folder)
 
 ## Create the adjacency matrix
 n = np.max(enron)+1

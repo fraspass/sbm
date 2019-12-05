@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys
+import sys, os
 import argparse
 import numpy as np
 from numpy.linalg import svd,eigh
@@ -32,7 +32,10 @@ parser.add_argument("-n2","--nodes2", type=int, dest="n2", default=2500, const=T
 # Latent dimension
 parser.add_argument("-d","--dim", type=int, dest="d", default=2, const=True, nargs="?",\
     help="Integer: latent dimension, default 2")
-# Latent dimension
+# Redundant dimension of the embedding
+parser.add_argument("-m", type=int, dest="m", default=50, const=True, nargs="?",\
+    help="Integer: redundant dimension, default 50")
+# Number of clusters
 parser.add_argument("-K","--clust", type=int, dest="K", default=5, const=True, nargs="?",\
     help="Integer: number of clusters, default 5")
 parser.add_argument("-K2","--clust2", type=int, dest="K2", default=3, const=True, nargs="?",\
@@ -49,6 +52,9 @@ parser.add_argument("-l","--lap", type=str2bool, dest="use_laplacian", default=F
 # Boolean variable for coclustering
 parser.add_argument("-c","--coclust", type=str2bool, dest="coclust", default=False, const=False, nargs="?",\
     help="Boolean variable for coclustering, default FALSE")
+# Constrained/unconstrained model
+parser.add_argument("-q","--constraint", type=str2bool, dest="constraint", default=False, const=False, nargs="?",\
+    help="Boolean variable for the constrained/unconstrained model, default UNCONSTRAINED (0)")
 # Run MCMC yes/no or simulate data only
 parser.add_argument("-r","--run", type=str2bool, dest="run_mcmc", default=False, const=False, nargs="?",\
     help="Boolean variable for running MCMC on the simulated dataset. If TRUE, runs MCMC. If FALSE, produces summary plots on the simulated dataset. Default FALSE")
@@ -63,11 +69,12 @@ parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=500000, cons
     help="Integer: length of MCMC chain after burnin, default 500000")
 ## Set destination folder for output
 parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="Results", const=True, nargs="?",\
-    help="String: name of the destination folder for the output files (*** the folder must exist ***)")
+    help="String: name of the destination folder for the output files")
 
 ## Parse arguments
 args = parser.parse_args()
 n = args.n
+m = args.m
 n2 = args.n2
 d = args.d
 K = args.K
@@ -76,11 +83,16 @@ gen_directed = args.gen_directed
 gen_bipartite = args.gen_bipartite
 use_laplacian = args.use_laplacian
 coclust = args.coclust
+constraint = args.constraint
 run_mcmc = args.run_mcmc
 second_order_clustering = args.second_order_clustering
 nburn = args.nburn
 nsamp = args.nsamp
 dest_folder = args.dest_folder
+
+# Create output directory if doesn't exist
+if dest_folder != '' and not os.path.exists(dest_folder):
+    os.mkdir(dest_folder)
 
 ## Check exceptions
 if use_laplacian and (gen_directed or gen_bipartite):
@@ -136,7 +148,7 @@ else:
             A[i,j] = np.random.binomial(1,B[c[i],c2[j] if coclust else c[j]])
 
 ## Construct a Gibbs sampling object
-g = mcmc_sampler_sbm.mcmc_sbm(np.dot(np.dot(np.diag(A.sum(axis=0)**(-.5)),A),np.diag(A.sum(axis=0)**(-.5))) if (not gen_directed) and use_laplacian else A, m=50)
+g = mcmc_sampler_sbm.mcmc_sbm(np.dot(np.dot(np.diag(A.sum(axis=0)**(-.5)),A),np.diag(A.sum(axis=0)**(-.5))) if (not gen_directed) and use_laplacian else A, m=m)
 
 ## Initialise clustering
 if run_mcmc:
@@ -151,7 +163,7 @@ else:
         g.init_cluster(z=c)
 
 ## Initialise d 
-g.init_dim(d=5,delta=0.1)
+g.init_dim(d=5,delta=0.1,d_constrained=constraint)
 
 ## Initialise parameters
 if not gen_directed:
@@ -375,7 +387,7 @@ if run_mcmc:
             ## - without second order clustering
             move = np.random.choice(['gibbs_comm','split_merge','change_dim','prop_empty'])
         if move == 'gibbs_comm':
-            g.gibbs_communities()
+            g.gibbs_communities(l=g.n)
         elif move == 'split_merge':
             g.split_merge()
         elif move == 'change_dim':
@@ -462,23 +474,30 @@ if run_mcmc:
 
     ## MAP for clustering
     if coclust:
+        cc_true = {}
+        cc_true['s'] = c
+        cc_true['r'] = c2
         cc_pear = {}
         cc_map = {}
         for key in ['s','r']:
             cc_pear[key] = estimate_clustering(psm[key])
             cc_map[key] = estimate_clustering(psm[key],k=mode(Ko[key])[0][0])
             if dest_folder == '':
+                np.savetxt('true_clusters_'+key+'.txt',cc_true[key],fmt='%d')
                 np.savetxt('pear_clusters_'+key+'.txt',cc_pear[key],fmt='%d')
                 np.savetxt('map_clusters_'+key+'.txt',cc_map[key],fmt='%d')
             else:
+                np.savetxt(dest_folder+'/true_clusters_'+key+'.txt',cc_true[key],fmt='%d')
                 np.savetxt(dest_folder+'/pear_clusters_'+key+'.txt',cc_pear[key],fmt='%d')
                 np.savetxt(dest_folder+'/map_clusters_'+key+'.txt',cc_map[key],fmt='%d')
     else:
         cc_pear = estimate_clustering(psm)
         cc_map = estimate_clustering(psm,k=mode(Ko)[0][0])
         if dest_folder == '':
+            np.savetxt('true_clusters.txt',c,fmt='%d')
             np.savetxt('pear_clusters.txt',cc_pear,fmt='%d')
             np.savetxt('map_clusters.txt',cc_map,fmt='%d')
         else:
+            np.savetxt(dest_folder+'/true_clusters.txt',c,fmt='%d')
             np.savetxt(dest_folder+'/pear_clusters.txt',cc_pear,fmt='%d')
             np.savetxt(dest_folder+'/map_clusters.txt',cc_map,fmt='%d')
