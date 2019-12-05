@@ -17,14 +17,16 @@ utils.install_packages('mcclust')
 
 ## Running the code
 
-Running the code is easy: `/synthetic_sbm.py --help`, `/synthetic_sbm.py --help` and `/synthetic_sbm.py --help` give detailed instruction on the possible options. For example, for `/synthetic_sbm.py --help`:
+Running the code is easy: `./synthetic_sbm.py --help`, `./santander.py --help` and `/enron.py --help` give detailed instruction on the possible options. For example, for `./synthetic_sbm.py --help`:
 
 * `-n` is the number of nodes. Additionally, `-n2` can be used for bipartite graphs,
 * `-d` is the true latent dimension in the simulated graph,
+* `-m` is the (redundant) dimension for the embedding,
 * `-K` (and `-K2` for co-clustering) represents the number of clusters, 
 * `-g` and `-b` are Boolean variables used for generating directed and bipartite graphs respectively,
 * `-l` is a Boolean variable used for making inference on the Laplacian spectral embedding (LSE). The adjacency spectral embedding (ASE) is the default.
 * `-c` and `-s` are Boolean variables used for co-clustering and second-level clustering respectively,
+* `-q` is Boolean variables used for the unconstrained or constrained model,
 * `-r` is a Boolean variable: if it is set to `1`, then MCMC is run on the simulated graphs, otherwise summary plots are produced, 
 * `-M` and `-B` denote the number of samples in the MCMC chain, and the burnin,
 * `-f` is the name of the destination folder for the output files. It must be **pre-existent**. 
@@ -35,7 +37,7 @@ For example, if the user wants to obtain 25000 MCMC samples from the posterior f
 ./enron.py -M 25000 -B 0 -c yes -s yes -f Output
 
 ```
-The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters <img alt="$K_\varnothing$" src="svgs/c09a28e6f1aeb430bd603a5562d11a90.svg" align="middle" width="24.235233pt" height="22.4657235pt"/>, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
+The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters <img src="svgs/c09a28e6f1aeb430bd603a5562d11a90.svg?invert_in_darkmode" align=middle width=24.235232999999997pt height=22.465723499999996pt/>, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
 
 Reproducing the figures in the paper is also easy. For example, for Figure 5:
 ```
