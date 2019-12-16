@@ -459,7 +459,7 @@ class mcmc_sbm:
 					self.kappank[zold] -= 1.0
 					self.lambdank[self.v[zold] if self.equal_var else zold] -= 1.0
 				if self.directed:
-					Delta_old = {}; Delta_inv_old = {}; Delta_det_old = {};
+					Delta_old = {}; Delta_inv_old = {}; Delta_det_old = {}
 					for key in ['s','r']:
 						self.sigmank[key][self.v[zold] if self.equal_var else zold] -= (position_right[key] ** 2)
 						self.mean_k[key][zold] = (self.prior_sum[key][:self.d] + self.sum_x[key][zold]) / self.kappank[key][zold]
