@@ -230,9 +230,11 @@ else:
 for key in [indep_key] if indep_analysis else ['s','r']:
     plt.figure()
     fig, ax = plt.subplots()
-    ax.bar(np.array(Counter(Ko[key]).keys())-.35,Counter(Ko[key]).values(),width=0.35,color='black',align='edge',alpha=.8,label='$K_\\varnothing$')
+    ax.bar(np.array(Counter(Ko[key]).keys())-.35,np.array(Counter(Ko[key]).values())/float(np.sum(Counter(Ko[key]).values())),
+                            width=0.35,color='black',align='edge',alpha=.8,label='$K_\\varnothing$')
     if second_order_clustering:
-        ax.bar(np.array(Counter(Ho[key]).keys()),Counter(Ho[key]).values(),width=0.35,color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
+        ax.bar(np.array(Counter(Ho[key]).keys()),np.array(Counter(Ho[key]).values())/float(np.sum(Counter(Ho[key]).values())),
+                            width=0.35,color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
     leg = ax.legend()
     ax.axvline(x=mode(d)[0][0],linestyle='--',c='red')
     if dest_folder == '':
@@ -250,11 +252,11 @@ for key in [indep_key] if indep_analysis else ['s','r']:
 for key in [indep_key] if indep_analysis else ['s','r']:
     plt.figure()
     fig, ax = plt.subplots()
-    ax.bar(np.array(Counter((Ko[key])[Ko[key] >= d]).keys())-.35,Counter((Ko[key])[Ko[key] >= d]).values(),width=0.35,
-        color='black',align='edge',alpha=.8,label='$K_\\varnothing$')
+    ax.bar(np.array(Counter((Ko[key])[Ko[key] >= d]).keys())-.35,np.array(Counter((Ko[key])[Ko[key] >= d]).values())/float(np.sum(Counter((Ko[key])[Ko[key] >= d]).values())),
+                        width=0.35,color='black',align='edge',alpha=.8,label='$K_\\varnothing$')
     if second_order_clustering:
-        ax.bar(np.array(Counter((Ho[key])[Ko[key] >= d]).keys()),Counter((Ho[key])[Ko[key] >= d]).values(),width=0.35,
-            color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
+        ax.bar(np.array(Counter((Ho[key])[Ko[key] >= d]).keys()),np.array(Counter((Ho[key])[Ko[key] >= d]).values())/float(np.sum(Counter((Ho[key])[Ko[key] >= d]).values())),
+                        width=0.35,color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
     leg = ax.legend()
     ax.axvline(x=mode(d)[0][0],linestyle='--',c='red')
     if dest_folder == '':
