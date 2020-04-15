@@ -234,7 +234,7 @@ for key in [indep_key] if indep_analysis else ['s','r']:
     if second_order_clustering:
         ax.bar(np.array(Counter(Ho[key]).keys()),Counter(Ho[key]).values(),width=0.35,color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
     leg = ax.legend()
-    plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
+    ax.axvline(x=mode(d)[0][0],linestyle='--',c='red')
     if dest_folder == '':
         if not tex_figures:
             plt.savefig('posterior_barplot_unrestricted_'+key+'.pdf')
@@ -256,7 +256,7 @@ for key in [indep_key] if indep_analysis else ['s','r']:
         ax.bar(np.array(Counter((Ho[key])[Ko[key] >= d]).keys()),Counter((Ho[key])[Ko[key] >= d]).values(),width=0.35,
             color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
     leg = ax.legend()
-    plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
+    ax.axvline(x=mode(d)[0][0],linestyle='--',c='red')
     if dest_folder == '':
         if not tex_figures:
             plt.savefig('posterior_barplot_restricted_'+key+'.pdf')
