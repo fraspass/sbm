@@ -391,6 +391,51 @@ class mcmc_sbm:
 		self.lambdank = lambdank_v
 		self.sigmank = sigmank_v
 
+	## Analysis exclusively on Xs or Xr (transform the bipartite or directed object into undirected graph)
+	def independent_analysis(self,key='s'):
+		if key not in ['s','r']:
+			return ValueError("key must be 's' or 'r'.")
+		if not self.directed:
+			return ValueError("The graph is undirected.")
+		## If coclustering was used for initialisation
+		self.X = self.X[key]
+		self.full_outer_x = self.full_outer_x[key]
+		if self.coclust:
+			self.z = self.z[key]
+			self.K = self.K[key]
+			self.Ko = self.Ko[key]
+			self.n = self.n[key]
+			self.nk = self.nk[key]
+			self.alpha = self.alpha[key]
+			self.H = self.H[key]
+			self.v = self.v[key]
+			self.vk = self.vk[key]
+			self.beta = self.beta[key]
+		self.mean0 = self.mean0[key]
+		self.kappa0 = self.kappa0[key]
+		self.nu0 = self.nu0[key]
+		self.Delta0 = self.Delta0[key]
+		self.kappank = self.kappank[key]
+		self.nunk = self.nunk[key]
+		self.prior_sum = self.prior_sum[key]
+		self.prior_outer = self.prior_outer[key]
+		self.sum_x = self.sum_x[key]
+		self.mean_k = self.mean_k[key]
+		self.squared_sum_x = self.squared_sum_x[key]
+		self.Delta_k = self.Delta_k[key]
+		self.Delta_k_inv = self.Delta_k_inv[key]
+		self.Delta_k_det = self.Delta_k_det[key]
+		self.Delta0_det = self.Delta0_det[key]
+		self.sigma0 = self.sigma0[key]
+		self.lambda0 = self.lambda0[key]
+		self.prior_sigma = self.prior_sigma[key]
+		self.lambdank = self.lambdank[key]
+		self.sigmank = self.sigmank[key]
+		## Set to undirected graph
+		self.bipartite = False
+		self.directed = False
+		self.coclust = False
+
 	########################################################
 	### a. Resample the allocations using Gibbs sampling ###
 	########################################################
