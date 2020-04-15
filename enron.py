@@ -9,6 +9,7 @@ from estimate_cluster import estimate_clustering
 from sklearn.cluster import KMeans
 from scipy.stats import mode
 from collections import Counter
+from matplotlib2tikz import save as tikz_save
 
 ## Boolean type for parser
 def str2bool(v):
@@ -36,6 +37,9 @@ parser.add_argument("-c","--coclust", type=str2bool, dest="coclust", default=Fal
 # Boolean variable to use second level clustering (default True)
 parser.add_argument("-s","--sord", type=str2bool, dest="second_order_clustering", default=True, const=False, nargs="?",\
     help="Boolean variable for second level clustering, default TRUE")
+# Add options for .tex figures
+parser.add_argument("-t","--tex", type=str2bool, dest="tex_figures", default=False, const=False, nargs="?",\
+    help="Boolean variable for .tex figures, default FALSE")
 # Burnin
 parser.add_argument("-B","--nburn", type=int, dest="nburn", default=25000, const=True, nargs="?",\
     help="Integer: length of burnin, default 25000")
@@ -50,6 +54,7 @@ parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="Resu
 args = parser.parse_args()
 coclust = args.coclust
 second_order_clustering = args.second_order_clustering
+tex_figures = args.tex_figures
 nburn = args.nburn
 nsamp = args.nsamp
 dest_folder = args.dest_folder
@@ -239,9 +244,15 @@ plt.plot(np.arange(len(S))+1,S,c='black')
 plt.plot(np.arange(len(S))+1,S,'.',markersize=.3,c='black')
 plt.plot(mode(d)[0][0]+1,S[mode(d)[0][0]],"o",c='red')
 if dest_folder == '':
-    plt.savefig('scree_plot.pdf')
+    if not tex_figures:
+        plt.savefig('scree_plot.pdf')
+    else:
+        tikz_save('scree_plot.tex')
 else:
-    plt.savefig(dest_folder+'/scree_plot.pdf')
+    if not tex_figures:
+        plt.savefig(dest_folder+'/scree_plot.pdf')
+    else:
+        tikz_save(dest_folder+'/scree_plot.tex')
 
 ## Posterior barplot (unrestricted)
 if coclust:
@@ -254,9 +265,15 @@ if coclust:
         leg = ax.legend()
         plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
         if dest_folder == '':
-            plt.savefig('posterior_barplot_unrestricted_'+key+'.pdf')
+            if not tex_figures:
+                plt.savefig('posterior_barplot_unrestricted_'+key+'.pdf')
+            else:
+                tikz_save('posterior_barplot_unrestricted_'+key+'.tex')
         else:
-            plt.savefig(dest_folder+'/posterior_barplot_unrestricted_'+key+'.pdf')
+            if not tex_figures:
+                plt.savefig(dest_folder+'/posterior_barplot_unrestricted_'+key+'.pdf')
+            else:
+                tikz_save(dest_folder+'/posterior_barplot_unrestricted_'+key+'.tex')
 else:
     plt.figure()
     fig, ax = plt.subplots()
@@ -266,9 +283,15 @@ else:
     leg = ax.legend()
     plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
     if dest_folder == '':
-        plt.savefig('posterior_barplot_unrestricted.pdf')
+        if not tex_figures:
+            plt.savefig('posterior_barplot_unrestricted.pdf')
+        else:
+            tikz_save('posterior_barplot_unrestricted.tex')
     else:
-        plt.savefig(dest_folder+'/posterior_barplot_unrestricted.pdf')
+        if not tex_figures:
+            plt.savefig(dest_folder+'/posterior_barplot_unrestricted.pdf')
+        else:
+            tikz_save(dest_folder+'/posterior_barplot_unrestricted.tex')
 
 ## Posterior barplot (restricted)
 if coclust:
@@ -283,9 +306,15 @@ if coclust:
         leg = ax.legend()
         plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
         if dest_folder == '':
-            plt.savefig('posterior_barplot_restricted_'+key+'.pdf')
+            if not tex_figures:
+                plt.savefig('posterior_barplot_restricted_'+key+'.pdf')
+            else:
+                tikz_save('posterior_barplot_restricted_'+key+'.tex')
         else:
-            plt.savefig(dest_folder+'/posterior_barplot_restricted_'+key+'.pdf')
+            if not tex_figures:
+                plt.savefig(dest_folder+'/posterior_barplot_restricted_'+key+'.pdf')
+            else:
+                tikz_save(dest_folder+'/posterior_barplot_restricted_'+key+'.tex')
 else:
     plt.figure()
     fig, ax = plt.subplots()
@@ -295,9 +324,15 @@ else:
     leg = ax.legend()
     plt.axvline(x=mode(d)[0][0],linestyle='--',c='red')
     if dest_folder == '':
-        plt.savefig('posterior_barplot_restricted.pdf')
+        if not tex_figures:
+            plt.savefig('posterior_barplot_restricted.pdf')
+        else:
+            tikz_save('posterior_barplot_restricted.tex')
     else:
-        plt.savefig(dest_folder+'/posterior_barplot_restricted.pdf')
+        if not tex_figures:
+            plt.savefig(dest_folder+'/posterior_barplot_restricted.pdf')
+        else:
+            tikz_save(dest_folder+'/posterior_barplot_restricted.tex')
 
 ## MAP for clustering
 if coclust:
@@ -321,4 +356,3 @@ else:
     else:
         np.savetxt(dest_folder+'/pear_clusters.txt',cc_pear,fmt='%d')
         np.savetxt(dest_folder+'/map_clusters.txt',cc_map,fmt='%d')
-
