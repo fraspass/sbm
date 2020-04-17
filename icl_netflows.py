@@ -21,7 +21,7 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-##################################
+################################## 
 ## Analysis of the ICL netflows ##
 ##################################
 
@@ -81,7 +81,7 @@ A = coo_matrix((np.repeat(1.0,len(rows)),(rows,cols)),shape=(n1,n2))
 ## Construct the Gibbs sampling object
 g = mcmc_sampler_sbm.mcmc_sbm(A,m=100)
 
-## Initialise the clusters using k-means
+## Initialise the clusters using k-means  
 g.init_cocluster(zs=KMeans(n_clusters=15).fit(g.X['s'][:,:15]).labels_,zr=KMeans(n_clusters=10).fit(g.X['r'][:,:10]).labels_)
 
 ## Average within-cluster variance
@@ -216,9 +216,9 @@ else:
 ## Scree plot
 U,S,V = svds(A,k=150)
 plt.figure()
-plt.plot(np.arange(len(S))+1,S,c='black')
-plt.plot(np.arange(len(S))+1,S,'.',markersize=.3,c='black')
-plt.plot(mode(d)[0][0]+1,S[mode(d)[0][0]],"o",c='red')
+plt.plot(np.arange(len(S))+1,S[::-1],c='black')
+plt.plot(np.arange(len(S))+1,S[::-1],'.',markersize=.3,c='black')
+plt.plot(mode(d)[0][0]+1,S[::-1][mode(d)[0][0]],"o",c='red')
 if dest_folder == '':
     if not tex_figures:
         plt.savefig('scree_plot.pdf')
@@ -262,7 +262,7 @@ for key in [indep_key] if indep_analysis else ['s','r']:
         ax.bar(np.array(Counter((Ho[key])[Ko[key] >= d]).keys()),np.array(Counter((Ho[key])[Ko[key] >= d]).values())/float(np.sum(Counter((Ho[key])[Ko[key] >= d]).values())),
                         width=0.35,color='gray',align='edge',alpha=.8,label='$H_\\varnothing$')
     leg = ax.legend()
-    ax.axvline(x=mode(d)[0][0],linestyle='--',c='red')
+    ax.axvline(x=mode(d[Ko[key] >= d])[0][0],linestyle='--',c='red')
     if dest_folder == '':
         if not tex_figures:
             plt.savefig('posterior_barplot_restricted_'+key+'.pdf')
