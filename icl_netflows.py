@@ -2,13 +2,14 @@
 import sys, os
 import argparse
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import mcmc_sampler_sbm
 from estimate_cluster import estimate_clustering
 from sklearn.cluster import KMeans
 from scipy.stats import mode
 from collections import Counter
+from scipy.sparse import coo_matrix
+from scipy.sparse.linalg import svds
 from matplotlib2tikz import save as tikz_save
 
 ## Boolean type for parser
@@ -25,7 +26,7 @@ def str2bool(v):
 ##################################
 
 ## Import the dataset
-huxley = np.loadtxt('Datasets/huxley_edges_filter_map.csv',dtype=int,delimiter=',')
+college = np.loadtxt('Datasets/college_edges_filter_map.csv',dtype=int,delimiter=',')
 
 ###### MODEL ARGUMENTS 
 
@@ -46,7 +47,7 @@ parser.add_argument("-t","--tex", type=str2bool, dest="tex_figures", default=Fal
 parser.add_argument("-B","--nburn", type=int, dest="nburn", default=2500, const=True, nargs="?",\
     help="Integer: length of burnin, default 25000")
 # Number of samples
-parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=20000, const=True, nargs="?",\
+parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=25000, const=True, nargs="?",\
     help="Integer: length of MCMC chain after burnin, default 500000")
 ## Set destination folder for output
 parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="Results", const=True, nargs="?",\
@@ -68,17 +69,20 @@ if dest_folder != '' and not os.path.exists(dest_folder):
     os.mkdir(dest_folder)
 
 ## Create the adjacency matrix
-n1 = np.max(huxley[:,0])+1
-n2 = np.max(huxley[:,1])+1
-A = np.zeros((n1,n2))
-for link in huxley:
-    A[link[0],link[1]] = 1.0
+n1 = np.max(college[:,0])+1
+n2 = np.max(college[:,1])+1
+rows = []; cols = []
+for link in college:
+    rows += [link[0]]
+    cols += [link[1]]
+
+A = coo_matrix((np.repeat(1.0,len(rows)),(rows,cols)),shape=(n1,n2))
 
 ## Construct the Gibbs sampling object
 g = mcmc_sampler_sbm.mcmc_sbm(A,m=100)
 
 ## Initialise the clusters using k-means
-g.init_cocluster(zs=KMeans(n_clusters=6).fit(g.X['s'][:,:6]).labels_,zr=KMeans(n_clusters=10).fit(g.X['r'][:,:10]).labels_)
+g.init_cocluster(zs=KMeans(n_clusters=15).fit(g.X['s'][:,:15]).labels_,zr=KMeans(n_clusters=10).fit(g.X['r'][:,:10]).labels_)
 
 ## Average within-cluster variance
 v = {} 
@@ -210,7 +214,7 @@ else:
 ##### Plots #####
 
 ## Scree plot
-U,S,V = np.linalg.svd(A)
+U,S,V = svds(A,k=150)
 plt.figure()
 plt.plot(np.arange(len(S))+1,S,c='black')
 plt.plot(np.arange(len(S))+1,S,'.',markersize=.3,c='black')
