@@ -26,15 +26,16 @@ def str2bool(v):
 ##################################
 
 ## Import the dataset
-college = np.loadtxt('Datasets/college_edges_filter_map.csv',dtype=int,delimiter=',')
+## college = np.loadtxt('Datasets/college_hu_ch_sp_cx_map.csv',dtype=int,delimiter=',')
+college = np.loadtxt('Datasets/college_hu_bl_sp_ee_cg_map.csv',dtype=int,delimiter=',')
 
 ###### MODEL ARGUMENTS 
 
 ## PARSER to give parameter values 
 parser = argparse.ArgumentParser()
 # Boolean variable to use second level clustering (default True)
-parser.add_argument("-s","--sord", type=str2bool, dest="second_order_clustering", default=True, const=False, nargs="?",\
-    help="Boolean variable for second level clustering, default TRUE")
+parser.add_argument("-s","--sord", type=str2bool, dest="second_order_clustering", default=False, const=False, nargs="?",\
+    help="Boolean variable for second level clustering, default FALSE")
 # Boolean variables for independent analysis (default False)
 parser.add_argument("-i","--indep", type=str2bool, dest="indep_analysis", default=False, const=False, nargs="?",\
     help="Boolean variable for independent analysis on source or destination embeddings for directed graphs, default FALSE")
@@ -45,10 +46,10 @@ parser.add_argument("-t","--tex", type=str2bool, dest="tex_figures", default=Fal
     help="Boolean variable for .tex figures, default FALSE")
 # Burnin
 parser.add_argument("-B","--nburn", type=int, dest="nburn", default=2500, const=True, nargs="?",\
-    help="Integer: length of burnin, default 25000")
+    help="Integer: length of burnin, default 2500")
 # Number of samples
 parser.add_argument("-M","--nsamp", type=int, dest="nsamp", default=25000, const=True, nargs="?",\
-    help="Integer: length of MCMC chain after burnin, default 500000")
+    help="Integer: length of MCMC chain after burnin, default 25000")
 ## Set destination folder for output
 parser.add_argument("-f","--folder", type=str, dest="dest_folder", default="Results", const=True, nargs="?",\
     help="String: name of the destination folder for the output files (*** the folder must exist ***)")
@@ -76,35 +77,62 @@ for link in college:
     rows += [link[0]]
     cols += [link[1]]
 
+## Remove top observations
+remove_top = 0
+add_removed = True
+
+## Adjacency matrix
 A = coo_matrix((np.repeat(1.0,len(rows)),(rows,cols)),shape=(n1,n2))
 
-## Construct the Gibbs sampling object
-g = mcmc_sampler_sbm.mcmc_sbm(A,m=100)
-
-## Initialise the clusters using k-means  
-g.init_cocluster(zs=KMeans(n_clusters=15).fit(g.X['s'][:,:15]).labels_,zr=KMeans(n_clusters=10).fit(g.X['r'][:,:10]).labels_)
-
-## Average within-cluster variance
-v = {} 
-v['s'] = np.zeros(g.m)
-v['r'] = np.zeros(g.m)
-for key in ['s','r']:
-    for k in range(g.K[key] if g.coclust else g.K):
-        v[key] += np.var(g.X[key][(g.z[key] if g.coclust else g.z) == k],axis=0) / (g.K[key] if g.coclust else g.K)
-
-## Initialise d 
-g.init_dim(d=g.K[key] if g.coclust else g.K,delta=0.1,d_constrained=False)
-
-## Initialise the parameters of the Gaussian distribution
-g.prior_gauss_left_directed(mean0s=np.zeros(g.m),mean0r=np.zeros(g.m),Delta0s=np.diag(v['s']),Delta0r=np.diag(v['r']))
-g.prior_gauss_right_directed(sigma0s=np.var(g.X['s'],axis=0),sigma0r=np.var(g.X['r'],axis=0))
-
-## Initialise the second level clustering
-g.init_group_variance_coclust(vs=range(g.K['s']),vr=range(g.K['r']))
-
-## Independent analysis using only the sources/destinations
 if indep_analysis:
-    g.independent_analysis(key=indep_key)
+    ## Obtain embeddings
+    u,s,v = svds(coo_matrix(A),k=100)
+    ## Calculate m from elbow eigengaps
+    m_start = np.max(np.diff(s[::-1]).argsort()[:5]) + 1
+    m = 50 ##m_start ## 30
+    if indep_key == 'r':
+        X = (v.T[:,::-1] * (s[::-1] ** .5))[:,remove_top:(m + remove_top * add_removed)]
+    else:
+        X = (u[:,::-1] * (s[::-1] ** .5))[:,remove_top:(m + remove_top * add_removed)]
+    ## Obtain graph object
+    g = mcmc_sampler_sbm.mcmc_sbm(A=X,initial_embedding=True)
+    ## Print dimension
+    print 'Dimension: '+str(g.m)
+    ## Initialise clusters
+    g.init_cluster(z=KMeans(n_clusters=m-remove_top).fit(g.X).labels_)
+    ## Average within-cluster variance
+    v = np.zeros(g.m)
+    for k in range(g.K):
+	    v += np.var(g.X[g.z == k],axis=0) / g.K
+    ## Initialise d 
+    g.init_dim(d=m_start if add_removed else g.m,delta=0.1,d_constrained=False)
+    ## Initialise the parameters of the Gaussian distribution
+    g.prior_gauss_left_undirected(mean0=np.zeros(g.m),Delta0=np.diag(v))
+    g.prior_gauss_right_undirected(sigma0=np.var(g.X,axis=0))
+    ## No second order clustering
+    g.init_group_variance_clust(v=range(g.K),beta=1.0)
+else:
+    ## Construct the Gibbs sampling object
+    g = mcmc_sampler_sbm.mcmc_sbm(A,m=50,remove_top=2)
+    ## Initialise the clusters using k-means  
+    g.init_cocluster(zs=KMeans(n_clusters=4).fit(g.X['s'][:,:4]).labels_,zr=KMeans(n_clusters=10).fit(g.X['r'][:,:10]).labels_)
+    ## Average within-cluster variance
+    v = {} 
+    v['s'] = np.zeros(g.m)
+    v['r'] = np.zeros(g.m)
+    for key in ['s','r']:
+        for k in range(g.K[key] if g.coclust else g.K):
+            v[key] += np.var(g.X[key][(g.z[key] if g.coclust else g.z) == k],axis=0) / (g.K[key] if g.coclust else g.K) 
+    ## Initialise d 
+    g.init_dim(d=g.K[indep_key] if g.coclust else g.K,delta=0.1,d_constrained=False)
+    ## Initialise the parameters of the Gaussian distribution
+    g.prior_gauss_left_directed(mean0s=np.zeros(g.m),mean0r=np.zeros(g.m),Delta0s=np.diag(v['s']),Delta0r=np.diag(v['r']))
+    g.prior_gauss_right_directed(sigma0s=np.var(g.X['s'],axis=0),sigma0r=np.var(g.X['r'],axis=0))
+    ## Initialise the second level clustering
+    g.init_group_variance_coclust(vs=range(g.K['s']),vr=range(g.K['r']))
+    ## Independent analysis using only the sources/destinations
+    if indep_analysis:
+        g.independent_analysis(key=indep_key)
 
 ## MCMC sampler
 d = []
@@ -214,7 +242,7 @@ else:
 ##### Plots #####
 
 ## Scree plot
-U,S,V = svds(A,k=150)
+U,S,V = svds(A,k=100)
 plt.figure()
 plt.plot(np.arange(len(S))+1,S[::-1],c='black')
 plt.plot(np.arange(len(S))+1,S[::-1],'.',markersize=.3,c='black')

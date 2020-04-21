@@ -20,7 +20,7 @@ from sklearn.cluster import KMeans
 class mcmc_sbm:
 	
 	## Initialise the class from the adjacency matrix A (or biadjacency matrix)
-	def __init__(self,A,m=100,grdpg=True,initial_embedding=False):
+	def __init__(self,A,m=100,grdpg=True,initial_embedding=False,remove_top=0):
 		self.grdpg = grdpg
 		if initial_embedding:
 			self.directed = False
@@ -61,20 +61,27 @@ class mcmc_sbm:
 			## Calculate the embedding
 			if self.directed:
 				## SVD decomposition of A
-				u,s,v = svds(coo_matrix(A),k=self.m) if self.sparse else svd(A)
+				u,s,v = svds(coo_matrix(A),k=self.m+remove_top) if self.sparse else svd(A)
 				self.X = {}
-				self.X['s'] = u[:,::-1] * (s[::-1] ** .5) if self.sparse else np.dot(u[:,:self.m],np.diag(np.sqrt(s[:self.m]))) 
-				self.X['r'] = v.T[:,::-1] * (s[::-1] ** .5) if self.sparse else np.dot(v.T[:,:self.m],np.diag(np.sqrt(s[:self.m])))
+				self.X['s'] = u[:,::-1] * (s[::-1] ** .5) if self.sparse else np.dot(u[:,:(self.m+remove_top)],
+												np.diag(np.sqrt(s[:(self.m+remove_top)]))) 
+				self.X['r'] = v.T[:,::-1] * (s[::-1] ** .5) if self.sparse else np.dot(v.T[:,:(self.m+remove_top)],
+												np.diag(np.sqrt(s[:(self.m+remove_top)])))
+				## Remove top columns
+				self.X['s'] = self.X['s'][:,remove_top:]
+				self.X['r'] = self.X['r'][:,remove_top:]
 			else:
 				## Spectral decomposition of A
-				w,v = eigs(coo_matrix(A),k=self.m,which='LM' if self.grdpg else 'LR') if self.sparse else eigh(A)
+				w,v = eigs(coo_matrix(A),k=self.m if not remove_top else self.m+1, which='LM' if self.grdpg else 'LR') if self.sparse else eigh(A)
 				## If self.sparse, fix the eigenvalues
 				if self.sparse:
 					w = w.real
 					v = v.real
 				## If GRDPG, use the top m eigenvalues in magnitude, otherwise use the standard RDPG embedding (top m eigenvalues)
 				w_mag = (-np.abs(w)).argsort() if grdpg else (-w).argsort()
-				self.X = np.dot(v[:,w_mag[:m]],np.diag(np.sqrt(abs(w[w_mag[:m]]))))
+				self.X = np.dot(v[:,w_mag[:(self.m if not remove_top else self.m+1)]],
+								np.diag(np.sqrt(abs(w[w_mag[:(self.m+remove_top)]]))))
+				self.X = self.X[:,remove_top:]
 		## Calculate an array of outer products for the entire node set
 		if self.directed:
 			self.full_outer_x = {}
