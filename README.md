@@ -2,7 +2,7 @@
 
 ## Methodology
 
-The model and datasets are described in *Sanna Passino, F. and Heard, N. A., "Bayesian estimation of the latent dimension and communities in stochastic blockmodels", Statistics and Computing (2020), to appear* ([link to the paper](https://link.springer.com/article/10.1007/s11222-020-09946-6)). 
+The model and datasets are described in *Sanna Passino, F. and Heard, N. A., "Bayesian estimation of the latent dimension and communities in stochastic blockmodels", Statistics and Computing, 2020 (to appear, [link to the journal publication](https://link.springer.com/article/10.1007/s11222-020-09946-6)). 
 
 ## Understanding the code
 
@@ -35,6 +35,7 @@ For example, if the user wants to obtain 25000 MCMC samples from the posterior f
 
 ```
 ./enron.py -M 25000 -B 0 -c yes -s yes -f Output
+
 ```
 The output consists in multiple files: for example, `Ko.txt` contains the MCMC chain for the number of non-empty clusters <img src="svgs/c09a28e6f1aeb430bd603a5562d11a90.svg?invert_in_darkmode" align=middle width=24.235233pt height=22.4657235pt/>, and `psm.txt` is the estimated posterior similarity matrix. The names of the output files are self-explanatory and consistent with the notation used in the paper.  
 
