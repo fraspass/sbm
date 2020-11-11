@@ -2,7 +2,7 @@
 
 ## Methodology
 
-The model and datasets are described in *Sanna Passino, F. and Heard, N. A., "Bayesian estimation of the latent dimension and communities in stochastic blockmodels", Statistics and Computing, 2020* (to appear, [link to the journal publication](https://link.springer.com/article/10.1007/s11222-020-09946-6)). 
+The model and datasets are described in *Sanna Passino, F. and Heard, N. A. (2020) "Bayesian estimation of the latent dimension and communities in stochastic blockmodels", Statistics and Computing, 30(5), 1291–1307* ([link to the journal publication](https://link.springer.com/article/10.1007/s11222-020-09946-6)). 
 
 ## Understanding the code
 
