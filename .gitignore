@@ -1,2 +1,13 @@
 .DS_Store
 */.DS_Store
+INPUT.md
+*.pyc
+Res*/
+*netflows*
+Datasets/college*
+Datasets/huxley*
+*_h1.py
+*_modal.py
+scatter*
+postprocess*
+marginal*
